@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import pathlib
 
 import paramiko
 from openai import OpenAI
@@ -8,30 +9,70 @@ from openai import OpenAI
 from runtime.models import CommandResponse, Request, Response, request_json_schema
 
 
+# Read the system prompt
+system_prompt_file_path = pathlib.Path(__file__).parent / "prompts" / "system.md"
+
 def execute_ssh_command(host, port, username, password, command):
-    # Use paramiko to connect via SSH and execute the command
+    # Initialize the SSH client
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    stdout_str = ''
+    stderr_str = ''
+    exit_status = None
+
     try:
+        # Connect to the SSH server
         client.connect(hostname=host, port=port, username=username, password=password)
-        stdin, stdout, stderr = client.exec_command(command)
-        exit_status = stdout.channel.recv_exit_status()
-        stdout_str = stdout.read().decode()
-        stderr_str = stderr.read().decode()
+        # Open a session and get a pseudo-terminal
+        transport = client.get_transport()
+        channel = transport.open_session()
+        channel.get_pty()
+        channel.exec_command(command)
+
+        # Loop to read output as it becomes available
+        while True:
+            # Check if data is ready to be read
+            if channel.recv_ready():
+                output = channel.recv(1024).decode('utf-8')
+                stdout_str += output
+                print(output, end='')  # Print live output
+
+            if channel.recv_stderr_ready():
+                error_output = channel.recv_stderr(1024).decode('utf-8')
+                stderr_str += error_output
+                print(error_output, end='')  # Print live error output
+
+            # Break the loop if the command execution is complete
+            if channel.exit_status_ready():
+                exit_status = channel.recv_exit_status()
+                break
+
+        # Read any remaining data after the command has completed
+        while channel.recv_ready():
+            output = channel.recv(1024).decode('utf-8')
+            stdout_str += output
+            print(output, end='')
+
+        while channel.recv_stderr_ready():
+            error_output = channel.recv_stderr(1024).decode('utf-8')
+            stderr_str += error_output
+            print(error_output, end='')
+
     except Exception as e:
         print(f"Error executing command {command}: {e}")
         exit_status = -1
-        stdout_str = ''
         stderr_str = str(e)
     finally:
         client.close()
 
+    # Create a CommandResponse object with the collected data
     cmd_response = CommandResponse(
         exit_code=exit_status,
         stdout=stdout_str,
         stderr=stderr_str
     )
     return cmd_response
+
 
 def main():
     # SSH configuration
