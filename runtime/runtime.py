@@ -11,6 +11,8 @@ from runtime.models import CommandResponse, Request, Response, request_json_sche
 
 # Read the system prompt
 system_prompt_file_path = pathlib.Path(__file__).parent / "prompts" / "system.md"
+with open(system_prompt_file_path, "r") as f:
+    system_prompt = f.read()
 
 def execute_ssh_command(host, port, username, password, command):
     # Initialize the SSH client
@@ -85,22 +87,6 @@ def main():
     conversation = []
 
     # Initial system prompt
-    system_prompt = """
-You are an AI assistant that outputs commands to be executed on a server via SSH.
-Your responses should be in JSON format matching the following structure:
-
-{
-    "thoughts": ["Your thoughts as a list of strings."],
-    "commands": ["List of commands to execute."]
-}
-
-Do not include any additional text outside of this JSON structure.
-
-After receiving the results of the commands, you can provide the next set of commands in the same format.
-
-Your current task: Determine a good position for the following prediction market: https://polymarket.com/event/scholz-out-as-chancellor-of-germany-in-2024
-"""
-
     conversation.append({"role": "system", "content": system_prompt})
 
     # Initial user message to start the conversation
