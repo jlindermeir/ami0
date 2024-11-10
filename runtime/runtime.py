@@ -189,10 +189,6 @@ def main():
             cmd_result = execute_ssh_command(ssh_host, ssh_port, ssh_username, ssh_password, command)
 
             logging.info(f"Exit code: {cmd_result.exit_code}")
-            logging.info("STDOUT:")
-            logging.info(cmd_result.stdout)
-            logging.info("STDERR:")
-            logging.info(cmd_result.stderr)
             results.append(cmd_result.dict())
 
         # Build Response object
