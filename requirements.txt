@@ -1,3 +1,4 @@
-pydantic
-openai
-
+pydantic~=2.9.2
+openai~=1.52.0
+paramiko~=3.5.0
+python-dotenv~=1.0.1
