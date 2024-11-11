@@ -1,14 +1,20 @@
 import datetime
 import json
+import logging
 import os
 import pathlib
-import logging
 
 import paramiko
 from openai import OpenAI
+from playwright.sync_api import sync_playwright
 
-from runtime.models import CommandResponse, Request, Response, request_json_schema
-
+from runtime.models import (
+    CommandResponse,
+    WebsiteResponse,
+    Request,
+    Response,
+    request_json_schema, WebsiteLink,
+)
 
 # Read the system prompt
 system_prompt_file_path = pathlib.Path(__file__).parent / "prompts" / "system.md"
@@ -16,7 +22,8 @@ with open(system_prompt_file_path, "r") as f:
     system_prompt = f.read()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+
 
 def get_user_confirmation(prompt, default='y'):
     valid_yes = ['y', 'yes']
@@ -33,17 +40,6 @@ def get_user_confirmation(prompt, default='y'):
         else:
             print("Please respond with 'y' or 'n'.")
 
-def get_user_choice(prompt, choices, default):
-    choices_str = '/'.join(choices)
-    prompt = f"{prompt} ({choices_str}), default is '{default}': "
-    while True:
-        choice = input(prompt).strip().lower()
-        if not choice:
-            choice = default.lower()
-        if choice in choices:
-            return choice
-        else:
-            print(f"Please choose from {choices_str}.")
 
 def execute_ssh_command(host, port, username, password, command):
     # Initialize the SSH client
@@ -107,6 +103,44 @@ def execute_ssh_command(host, port, username, password, command):
     return cmd_response
 
 
+def load_website(url):
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto('https://www.google.com')
+            page.wait_for_load_state('networkidle')
+
+            # Get the visible text of the page
+            text = page.evaluate('document.body.innerText')
+
+            # Get all links with their display text and URLs
+            link_dicts = page.evaluate('''() => {
+                return Array.from(document.querySelectorAll('a')).map(a => {
+                    return {
+                        text: a.innerText.trim(),
+                        href: a.href
+                    };
+                });
+            }''')
+
+        return WebsiteResponse(
+            url=url,
+            content=text,
+            links=[
+                WebsiteLink(text=link_dict['text'], link=link_dict['href'])
+                for link_dict in link_dicts
+            ]
+        )
+    except Exception as e:
+        logging.error(f"Error loading website '{url}': {e}")
+        return WebsiteResponse(
+            url=url,
+            content='Error loading website',
+            status_code=-1
+        )
+
+
 def main():
     # SSH configuration
     ssh_host = os.getenv("SSH_HOST", "localhost")
@@ -133,7 +167,7 @@ def main():
     while True:
         # Send the conversation to the model
         response = oai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=conversation,
             temperature=1,
             max_tokens=2048,
@@ -174,14 +208,14 @@ def main():
         for thought in request.thoughts:
             logging.info(f"- {thought}")
 
-        # For each command in commands list, send via SSH
-        results = []
+        # Process commands
+        command_results = []
         for command in request.commands:
             # Prompt the user for confirmation if the command should be executed.
             execute_command = get_user_confirmation(f"Execute command '{command}'?", default='y')
             if not execute_command:
                 logging.info(f"Skipping command '{command}'")
-                results.append(CommandResponse(exit_code=-1, stdout="", stderr="Command skipped by user"))
+                command_results.append(CommandResponse(exit_code=-1, stdout="", stderr="Command skipped by user"))
                 continue
 
             # Execute the command via SSH
@@ -189,12 +223,28 @@ def main():
             cmd_result = execute_ssh_command(ssh_host, ssh_port, ssh_username, ssh_password, command)
 
             logging.info(f"Exit code: {cmd_result.exit_code}")
-            results.append(cmd_result.dict())
+            command_results.append(cmd_result)
+
+        # Process websites
+        website_results = []
+        for url in request.websites:
+            # Prompt the user for confirmation if the website should be loaded.
+            load_site = get_user_confirmation(f"Load website '{url}'?", default='y')
+            if not load_site:
+                logging.info(f"Skipping website '{url}'")
+                website_results.append(WebsiteResponse(url=url, content='Website loading skipped by user', status_code=-1))
+                continue
+
+            # Load the website
+            logging.info(f"Loading website '{url}'...")
+            site_result = load_website(url)
+            website_results.append(site_result)
 
         # Build Response object
         response_obj = Response(
             timestamp=datetime.datetime.now().isoformat(),
-            results=results
+            results=command_results,
+            website_results=website_results
         )
 
         # Append the formatted response to the conversation
@@ -212,10 +262,11 @@ def main():
             break
         elif user_input:
             # User provided a message
-            conversation.append({"role": "system", "content": user_input})
+            conversation.append({"role": "user", "content": user_input})
         else:
             # No message, proceed
             pass
+
 
 if __name__ == "__main__":
     main()

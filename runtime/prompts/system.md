@@ -38,12 +38,14 @@ You will interact with the VM using the following JSON schema:
 ```json
 {
   "thoughts": ["Your thoughts related to the task."],
-  "commands": ["command_1", "command_2", "...additional commands"]
-}
+  "commands": ["command_1", "command_2", "...additional commands"],
+  "websites": ["URLs that you find useful for the task"]
 ```
 
 - **`thoughts`:** An array of your thoughts or reasoning related to the task.
 - **`commands`:** An array of shell commands to execute on the server via SSH.
+- **`websites`:** An array of URLs that you find useful for the task. 
+An object containing rendered text on the website, as well as any found links is returned in the output.
 - **Note:** Ensure that your JSON output strictly adheres to this schema. No additional properties should be included.
 
 **Best Practices:**

@@ -1,21 +1,28 @@
 from pydantic import BaseModel
 
-
 class Request(BaseModel):
     thoughts: list[str]
     commands: list[str]
-
+    websites: list[str]  # Added this field for website URLs
 
 class CommandResponse(BaseModel):
     exit_code: int
     stdout: str
     stderr: str
 
+class WebsiteLink(BaseModel):
+    text: str
+    link: str
+
+class WebsiteResponse(BaseModel):
+    url: str
+    content: str
+    links: list[WebsiteLink]
 
 class Response(BaseModel):
     timestamp: str
     results: list[CommandResponse]
-
+    website_results: list[WebsiteResponse]  # Added this field for website responses
 
 request_json_schema = {
     "type": "json_schema",
@@ -38,11 +45,19 @@ request_json_schema = {
                     "items": {
                         "type": "string"
                     }
+                },
+                "websites": {
+                    "type": "array",
+                    "description": "List of website URLs to load",
+                    "items": {
+                        "type": "string",
+                    }
                 }
             },
             "required": [
                 "thoughts",
-                "commands"
+                "commands",
+                "websites"
             ],
             "additionalProperties": False
         }
