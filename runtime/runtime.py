@@ -206,9 +206,16 @@ def main():
         logging.debug(response_json)
 
         # Proceed to next iteration
-        user_choice = get_user_choice("Press 'c' to continue or 'q' to quit", ['c', 'q'], default='c')
-        if user_choice == 'q':
+        user_input = input(
+            "Enter a message to send to the assistant, or 'q' to quit. Press Enter to continue without message: ").strip()
+        if user_input.lower() == 'q':
             break
+        elif user_input:
+            # User provided a message
+            conversation.append({"role": "system", "content": user_input})
+        else:
+            # No message, proceed
+            pass
 
 if __name__ == "__main__":
     main()
