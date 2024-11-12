@@ -40,28 +40,144 @@ You will interact with the VM using the following JSON schema:
 {
   "thoughts": ["Your thoughts related to the task."],
   "commands": ["command_1", "command_2", "...additional commands"],
-  "websites": ["URLs that you find useful for the task"]
+  "browser_actions": [
+    {
+      "action": "navigate",
+      "target": "URL_to_navigate"
+    },
+    {
+      "action": "click",
+      "target": "element_number_to_click"
+    },
+    "...additional browser actions"
+  ]
 }
 ```
 
 - **`thoughts`:** An array of your thoughts or reasoning related to the task.
 - **`commands`:** An array of shell commands to execute on the server via SSH.
-- **`websites`:** An array of URLs that you find useful for the task. 
-An object containing rendered text on the website, as well as any found links is returned in the output.
-Prefer to use this method to extract data from websites, only use the `commands` array when totally necessary.
-- **Note:** Ensure that your JSON output strictly adheres to this schema. No additional properties should be included.
+- **`browser_actions`:** An array of actions to interact with web pages. Each action is an object containing:
+  - **`action`:** The browser action to perform. Valid actions are:
+    - `"navigate"`: Navigate to a specified URL.
+    - `"click"`: Click on a clickable element identified by its number.
+  - **`target`:** The target of the action.
+    - For `"navigate"`, provide the URL as a string.
+    - For `"click"`, provide the element number as a string (e.g., `"1"`).
+
+**How to Use the Browser Actions:**
+
+1. **Navigate to a Web Page:**
+   - Use the `"navigate"` action with the URL you want to visit.
+   - Example:
+
+     ```json
+     {
+       "action": "navigate",
+       "target": "https://example.com"
+     }
+     ```
+
+2. **Interact with Page Elements:**
+   - After navigating, you will receive a response containing the page's text content and a list of clickable options.
+   - Each option includes a `number`, `text`, and `href`.
+   - To interact with an element, use the `"click"` action with the corresponding `number`.
+   - Example:
+
+     ```json
+     {
+       "action": "click",
+       "target": "2"
+     }
+     ```
+
+**Example Workflow:**
+
+1. **Initial Request to Navigate:**
+
+   ```json
+   {
+     "thoughts": ["I need to find the latest news on technology."],
+     "commands": [],
+     "browser_actions": [
+       {
+         "action": "navigate",
+         "target": "https://news.example.com"
+       }
+     ]
+   }
+   ```
+
+2. **Response from the System:**
+
+   ```json
+   {
+     "timestamp": "2023-10-01T12:34:56.789Z",
+     "results": [],
+     "browser_results": [
+       {
+         "url": "https://news.example.com",
+         "content": "Welcome to Example News...\n1. Tech News\n2. Sports\n3. Entertainment",
+         "options": [
+           {"number": 1, "text": "Tech News", "href": "/tech"},
+           {"number": 2, "text": "Sports", "href": "/sports"},
+           {"number": 3, "text": "Entertainment", "href": "/entertainment"}
+         ]
+       }
+     ]
+   }
+   ```
+
+3. **Next Request to Click an Option:**
+
+   ```json
+   {
+     "thoughts": ["I should check the tech news section."],
+     "commands": [],
+     "browser_actions": [
+       {
+         "action": "click",
+         "target": "1"
+       }
+     ]
+   }
+   ```
+
+4. **Subsequent Response from the System:**
+
+   ```json
+   {
+     "timestamp": "2023-10-01T12:35:10.123Z",
+     "results": [],
+     "browser_results": [
+       {
+         "url": "https://news.example.com/tech",
+         "content": "Latest Tech News...\n1. AI Breakthrough\n2. New Smartphone Release",
+         "options": [
+           {"number": 1, "text": "AI Breakthrough", "href": "/tech/ai-breakthrough"},
+           {"number": 2, "text": "New Smartphone Release", "href": "/tech/new-smartphone"}
+         ]
+       }
+     ]
+   }
+   ```
+
+**Note:** Ensure that your JSON output strictly adheres to this schema. No additional properties should be included.
 
 **Best Practices:**
 
+- **Browser Interaction:**
+  - **Sequence Actions Properly:** Always navigate to a page before attempting to click on page elements.
+  - **Reference Correct Elements:** Use the `number` provided in the `options` array to reference clickable elements accurately.
+  - **Limit Actions Per Request:** Include up to 5 `browser_actions` per request to maintain efficiency.
+  - **Avoid Unnecessary Commands:** Prefer using `browser_actions` for web interactions instead of shell commands.
+
 - **Command Execution:**
-  - Execute multiple commands when necessary, ensuring they are ordered correctly.
-  - Include up to 5 commands per request to maintain efficiency without overwhelming the system.
+  - **Batch Commands Wisely:** Group related commands together, ensuring they execute in the correct order.
+  - **Limit Command Quantity:** Include up to 5 commands per request to prevent system overload.
+
 - **Error Handling:**
-  - Check the outputs and handle errors gracefully.
-  - Log any errors to your log files for future reference.
-- **Session Management:**
-  - Maintain continuity by referencing previous session data stored in files.
-  - Use persistent storage to keep important information across sessions.
+  - **Check Responses:** Review system responses for errors or issues, and handle them gracefully.
+  - **Log Errors:** Keep a log of any errors encountered for future troubleshooting.
 
 **Maintaining Focus:**
 

@@ -1,28 +1,33 @@
 from pydantic import BaseModel
 
-class Request(BaseModel):
-    thoughts: list[str]
-    commands: list[str]
-    websites: list[str]  # Added this field for website URLs
-
 class CommandResponse(BaseModel):
     exit_code: int
     stdout: str
     stderr: str
 
-class WebsiteLink(BaseModel):
+class BrowserOption(BaseModel):
+    number: int
     text: str
-    link: str
+    href: str
 
-class WebsiteResponse(BaseModel):
+class BrowserResponse(BaseModel):
     url: str
     content: str
-    links: list[WebsiteLink]
+    options: list[BrowserOption]
 
 class Response(BaseModel):
     timestamp: str
     results: list[CommandResponse]
-    website_results: list[WebsiteResponse]  # Added this field for website responses
+    browser_results: list[BrowserResponse]
+
+class BrowserAction(BaseModel):
+    action: str  # e.g., "navigate", "click"
+    target: str  # URL for "navigate", element number for "click"
+
+class Request(BaseModel):
+    thoughts: list[str]
+    commands: list[str]
+    browser_actions: list[BrowserAction]
 
 request_json_schema = {
     "type": "json_schema",
@@ -46,18 +51,30 @@ request_json_schema = {
                         "type": "string"
                     }
                 },
-                "websites": {
+                "browser_actions": {
                     "type": "array",
-                    "description": "List of website URLs to load",
+                    "description": "List of browser actions to perform",
                     "items": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "description": "The browser action to perform, e.g., 'navigate', 'click'"
+                            },
+                            "target": {
+                                "type": "string",
+                                "description": "The target of the action, e.g., URL for 'navigate', element number for 'click'"
+                            }
+                        },
+                        "required": ["action", "target"],
+                        "additionalProperties": False
                     }
                 }
             },
             "required": [
                 "thoughts",
                 "commands",
-                "websites"
+                "browser_actions"
             ],
             "additionalProperties": False
         }

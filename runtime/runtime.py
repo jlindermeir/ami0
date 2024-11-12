@@ -7,15 +7,16 @@ import pathlib
 import openai
 import paramiko
 from openai import OpenAI
-from playwright.sync_api import sync_playwright
 
 from runtime.models import (
     CommandResponse,
-    WebsiteResponse,
+    BrowserResponse,
     Request,
     Response,
-    request_json_schema, WebsiteLink,
+    request_json_schema
 )
+
+from runtime.browser import TextBasedBrowser
 
 # Read the system prompt
 system_prompt_file_path = pathlib.Path(__file__).parent / "prompts" / "system.md"
@@ -105,44 +106,6 @@ def execute_ssh_command(host, port, username, password, command):
     return cmd_response
 
 
-def load_website(url):
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page()
-            page.goto(url)
-            page.wait_for_load_state('networkidle')
-
-            # Get the visible text of the page
-            text = page.evaluate('document.body.innerText')
-
-            # Get all links with their display text and URLs
-            link_dicts = page.evaluate('''() => {
-                return Array.from(document.querySelectorAll('a')).map(a => {
-                    return {
-                        text: a.innerText.trim(),
-                        href: a.href
-                    };
-                });
-            }''')
-
-        return WebsiteResponse(
-            url=url,
-            content=text,
-            links=[
-                WebsiteLink(text=link_dict['text'], link=link_dict['href'])
-                for link_dict in link_dicts
-            ]
-        )
-    except Exception as e:
-        logging.error(f"Error loading website '{url}': {e}")
-        return WebsiteResponse(
-            url=url,
-            content='Error loading website',
-            status_code=-1
-        )
-
-
 def main():
     # SSH configuration
     ssh_host = os.getenv("SSH_HOST", "localhost")
@@ -152,6 +115,10 @@ def main():
 
     # Log initial configuration
     logging.info(f"SSH configuration: host={ssh_host}, port={ssh_port}, username={ssh_username}")
+
+    # Initialize the text-based browser
+    browser = TextBasedBrowser()
+    browser.setup_browser()
 
     # Conversation history
     conversation = []
@@ -235,30 +202,84 @@ def main():
             logging.info(f"Exit code: {cmd_result.exit_code}")
             command_results.append(cmd_result)
 
-        # Process websites
-        website_results = []
-        for url in request.websites:
-            # Prompt the user for confirmation if the website should be loaded.
-            load_site = get_user_confirmation(f"Load website '{url}'?", default='y')
-            if not load_site:
-                logging.info(f"Skipping website '{url}'")
-                website_results.append(WebsiteResponse(url=url, content='Website loading skipped by user', links=[]))
-                continue
-
-            # Load the website
-            logging.info(f"Loading website '{url}'...")
-            site_result = load_website(url)
-            website_results.append(site_result)
+        # Process browser actions
+        browser_results = []
+        for action in request.browser_actions:
+            if action.action == "navigate":
+                # Prompt the user for confirmation
+                execute_action = get_user_confirmation(f"Navigate to URL '{action.target}'?", default='y')
+                if not execute_action:
+                    logging.info(f"Skipping navigation to '{action.target}'")
+                    browser_results.append(BrowserResponse(
+                        url=action.target,
+                        content='Navigation skipped by user',
+                        options=[]
+                    ))
+                    continue
+                logging.info(f"Navigating to URL '{action.target}'...")
+                try:
+                    browser.navigate_to_url(action.target)
+                    page_content = browser.get_page_content()
+                    options = browser.get_options()
+                    browser_response = BrowserResponse(
+                        url=browser.page.url,
+                        content=page_content,
+                        options=options
+                    )
+                    browser_results.append(browser_response)
+                except Exception as e:
+                    logging.error(f"Error navigating to URL '{action.target}': {e}")
+                    browser_results.append(BrowserResponse(
+                        url=action.target,
+                        content=f"Error loading website: {e}",
+                        options=[]
+                    ))
+            elif action.action == "click":
+                # Prompt the user for confirmation
+                execute_action = get_user_confirmation(f"Click element '{action.target}'?", default='y')
+                if not execute_action:
+                    logging.info(f"Skipping click on element '{action.target}'")
+                    browser_results.append(BrowserResponse(
+                        url=browser.page.url,
+                        content='Click action skipped by user',
+                        options=[]
+                    ))
+                    continue
+                logging.info(f"Clicking element '{action.target}'...")
+                try:
+                    browser.click_element(int(action.target))
+                    page_content = browser.get_page_content()
+                    options = browser.get_options()
+                    browser_response = BrowserResponse(
+                        url=browser.page.url,
+                        content=page_content,
+                        options=options
+                    )
+                    browser_results.append(browser_response)
+                except Exception as e:
+                    logging.error(f"Error clicking element '{action.target}': {e}")
+                    browser_results.append(BrowserResponse(
+                        url=browser.page.url,
+                        content=f"Error clicking element: {e}",
+                        options=[]
+                    ))
+            else:
+                logging.warning(f"Unknown browser action '{action.action}'")
+                browser_results.append(BrowserResponse(
+                    url=browser.page.url,
+                    content=f"Unknown browser action '{action.action}'",
+                    options=[]
+                ))
 
         # Build Response object
         response_obj = Response(
             timestamp=datetime.datetime.now().isoformat(),
             results=command_results,
-            website_results=website_results
+            browser_results=browser_results
         )
 
         # Append the formatted response to the conversation
-        response_json = json.dumps(response_obj.dict(), indent=2)
+        response_json = json.dumps(response_obj.model_dump(), indent=2)
         conversation.append({"role": "user", "content": response_json})
 
         # Log the response
@@ -276,6 +297,9 @@ def main():
         else:
             # No message, proceed
             pass
+
+    # Close the browser at the end
+    browser.close()
 
 
 if __name__ == "__main__":
