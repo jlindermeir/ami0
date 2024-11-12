@@ -137,7 +137,7 @@ def main():
         # Send the conversation to the model
         try:
             response = oai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=conversation,
                 temperature=1,
                 max_tokens=2048,
