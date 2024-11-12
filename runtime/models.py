@@ -19,7 +19,7 @@ class BrowserResponse(BaseModel):
 class Response(BaseModel):
     timestamp: str
     results: list[CommandResponse]
-    browser_results: list[BrowserResponse]
+    browser_result: Optional[BrowserResponse] = None
 
 class NavigateAction(BaseModel):
     action: Literal["navigate"] = "navigate"

@@ -203,59 +203,59 @@ def main():
             command_results.append(cmd_result)
 
         # Process browser actions
-        browser_results = []
+        browser_result = None  # Initialize as None
         if request.browser_action:
             action = request.browser_action
             if action.action == "navigate":
                 execute_action = get_user_confirmation(f"Navigate to URL '{action.target}'?", default='y')
                 if not execute_action:
                     logging.info(f"Skipping navigation to '{action.target}'")
-                    browser_results.append(BrowserResponse(
+                    browser_result = BrowserResponse(
                         url=action.target,
                         content='Navigation skipped by user'
-                    ))
+                    )
                 else:
                     logging.info(f"Navigating to URL '{action.target}'...")
                     try:
                         browser.navigate_to_url(action.target)
-                        browser_results.append(BrowserResponse(
+                        browser_result = BrowserResponse(
                             url=browser.page.url,
                             content=browser.get_annotated_page_content()
-                        ))
+                        )
                     except Exception as e:
                         logging.error(f"Error navigating to URL '{action.target}': {e}")
-                        browser_results.append(BrowserResponse(
+                        browser_result = BrowserResponse(
                             url=action.target,
                             content=f"Error loading website: {e}"
-                        ))
+                        )
             elif action.action == "click":
                 execute_action = get_user_confirmation(f"Click element '{action.target}'?", default='y')
                 if not execute_action:
                     logging.info(f"Skipping click on element '{action.target}'")
-                    browser_results.append(BrowserResponse(
+                    browser_result = BrowserResponse(
                         url=browser.page.url,
                         content='Click action skipped by user'
-                    ))
+                    )
                 else:
                     logging.info(f"Clicking element '{action.target}'...")
                     try:
                         browser.click_element(int(action.target))
-                        browser_results.append(BrowserResponse(
+                        browser_result = BrowserResponse(
                             url=browser.page.url,
                             content=browser.get_annotated_page_content()
-                        ))
+                        )
                     except Exception as e:
                         logging.error(f"Error clicking element '{action.target}': {e}")
-                        browser_results.append(BrowserResponse(
+                        browser_result = BrowserResponse(
                             url=browser.page.url,
                             content=f"Error clicking element: {e}"
-                        ))
+                        )
 
         # Build Response object
         response_obj = Response(
             timestamp=datetime.datetime.now().isoformat(),
             results=command_results,
-            browser_results=browser_results
+            browser_result=browser_result
         )
 
         # Append the formatted response to the conversation

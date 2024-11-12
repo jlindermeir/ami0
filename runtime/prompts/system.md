@@ -116,10 +116,10 @@ You will interact with the VM using the following JSON schema:
    {
      "timestamp": "2023-10-01T12:34:56.789Z",
      "results": [],
-     "browser_results": [{
+     "browser_result": {
        "url": "https://news.example.com",
        "content": "Welcome to Example News...\nTech News<1>\nSports<2>\nEntertainment<3>"
-     }]
+     }
    }
    ```
 
@@ -140,10 +140,10 @@ You will interact with the VM using the following JSON schema:
    {
      "timestamp": "2023-10-01T12:35:10.123Z",
      "results": [],
-     "browser_results": [{
+     "browser_result": {
        "url": "https://news.example.com/tech",
        "content": "Latest Tech News...\nAI Breakthrough<1>\nNew Smartphone Release<2>"
-     }]
+     }
    }
    ```
 
