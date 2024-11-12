@@ -4,8 +4,6 @@ from urllib.parse import urljoin
 import tiktoken
 from playwright.sync_api import sync_playwright, TimeoutError
 
-from runtime.models import BrowserOption  # Import the BrowserOption model
-
 
 class TextBasedBrowser:
     """A text-based browser using Playwright."""
