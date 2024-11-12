@@ -39,7 +39,7 @@ class TextBasedBrowser:
             raise
 
     def annotate_clickable_elements(self):
-        """Annotate clickable elements with option numbers and collect their info."""
+        """Annotate clickable elements with option numbers."""
         selector = "a[href], button, input[type=button], input[type=submit], input[type=reset]"
         elements = self.page.query_selector_all(selector)
 
@@ -47,34 +47,18 @@ class TextBasedBrowser:
             logging.warning("No clickable links or buttons found.")
             return []
 
-        options = []
         for i, element in enumerate(elements):
             option_number = i + 1
             text = element.inner_text().strip()
             if not text:
                 text = element.get_attribute('value') or '[No text]'
-            href = element.get_attribute('href') or ''
-            options.append({'number': option_number, 'element': element, 'href': href, 'text': text})
-
+            
             # Annotate the element's text content with the option number
             element.evaluate(
-                "(el, num) => { el.textContent += '<' + num + '>'; }", option_number
+                "(el, num) => { el.textContent = el.textContent.trim() + ' <' + num + '>'; }", 
+                option_number
             )
-        return options
-
-    def get_options(self):
-        """Return the list of options after annotating clickable elements."""
-        options = self.annotate_clickable_elements()
-        browser_options = []
-        for opt in options:
-            browser_options.append(
-                BrowserOption(
-                    number=opt['number'],
-                    text=opt['text'],
-                    href=opt['href']
-                )
-            )
-        return browser_options
+        return elements
 
     def get_page_text(self):
         """Get the text content of the page after annotation."""
@@ -88,12 +72,14 @@ class TextBasedBrowser:
 
     def click_element(self, element_number):
         """Click the element with the specified option number."""
-        options = self.annotate_clickable_elements()
-        if element_number < 1 or element_number > len(options):
+        elements = self.page.query_selector_all(
+            "a[href], button, input[type=button], input[type=submit], input[type=reset]"
+        )
+        if element_number < 1 or element_number > len(elements):
             raise ValueError("Invalid element number.")
-        selected = options[element_number - 1]
-        element = selected['element']
-        href = selected['href']
+        
+        element = elements[element_number - 1]
+        href = element.get_attribute('href')
 
         if href:
             url = urljoin(self.page.url, href)

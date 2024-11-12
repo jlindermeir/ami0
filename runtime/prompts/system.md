@@ -40,124 +40,110 @@ You will interact with the VM using the following JSON schema:
 {
   "thoughts": ["Your thoughts related to the task."],
   "commands": ["command_1", "command_2", "...additional commands"],
-  "browser_actions": [
-    {
-      "action": "navigate",
-      "target": "URL_to_navigate"
-    },
-    {
-      "action": "click",
-      "target": "element_number_to_click"
-    },
-    "...additional browser actions"
-  ]
+  "browser_action": {
+    "action": "navigate" | "click",
+    "target": "URL_to_navigate" | "element_number"
+  }
 }
 ```
 
 - **`thoughts`:** An array of your thoughts or reasoning related to the task.
 - **`commands`:** An array of shell commands to execute on the server via SSH.
-- **`browser_actions`:** An array of actions to interact with web pages. Each action is an object containing:
-  - **`action`:** The browser action to perform. Valid actions are:
-    - `"navigate"`: Navigate to a specified URL.
-    - `"click"`: Click on a clickable element identified by its number.
-  - **`target`:** The target of the action.
-    - For `"navigate"`, provide the URL as a string.
-    - For `"click"`, provide the element number as a string (e.g., `"1"`).
+- **`browser_action`:** A single action to interact with web pages, which can be either:
+  - A navigation action:
+    ```json
+    {
+      "action": "navigate",
+      "target": "https://example.com"
+    }
+    ```
+  - A click action:
+    ```json
+    {
+      "action": "click",
+      "target": "1"
+    }
+    ```
+  - Or `null` if no browser action is needed
 
 **How to Use the Browser Actions:**
 
 1. **Navigate to a Web Page:**
    - Use the `"navigate"` action with the URL you want to visit.
    - Example:
-
      ```json
      {
-       "action": "navigate",
-       "target": "https://example.com"
+       "thoughts": ["I need to find the latest news on technology."],
+       "commands": [],
+       "browser_action": {
+         "action": "navigate",
+         "target": "https://news.example.com"
+       }
      }
      ```
 
 2. **Interact with Page Elements:**
-   - After navigating, you will receive a response containing the page's text content and a list of clickable options.
-   - Each option includes a `number`, `text`, and `href`.
-   - To interact with an element, use the `"click"` action with the corresponding `number`.
+   - After navigating, you will receive a response containing the page's text content with clickable elements marked with `<number>` (e.g., "Click here<1>").
+   - To click an element, use its number in a click action.
    - Example:
-
      ```json
      {
-       "action": "click",
-       "target": "2"
+       "thoughts": ["I should click the first link."],
+       "commands": [],
+       "browser_action": {
+         "action": "click",
+         "target": "1"
+       }
      }
      ```
 
 **Example Workflow:**
 
 1. **Initial Request to Navigate:**
-
    ```json
    {
      "thoughts": ["I need to find the latest news on technology."],
      "commands": [],
-     "browser_actions": [
-       {
-         "action": "navigate",
-         "target": "https://news.example.com"
-       }
-     ]
+     "browser_action": {
+       "action": "navigate",
+       "target": "https://news.example.com"
+     }
    }
    ```
 
 2. **Response from the System:**
-
    ```json
    {
      "timestamp": "2023-10-01T12:34:56.789Z",
      "results": [],
-     "browser_results": [
-       {
-         "url": "https://news.example.com",
-         "content": "Welcome to Example News...\n1. Tech News\n2. Sports\n3. Entertainment",
-         "options": [
-           {"number": 1, "text": "Tech News", "href": "/tech"},
-           {"number": 2, "text": "Sports", "href": "/sports"},
-           {"number": 3, "text": "Entertainment", "href": "/entertainment"}
-         ]
-       }
-     ]
+     "browser_results": [{
+       "url": "https://news.example.com",
+       "content": "Welcome to Example News...\nTech News<1>\nSports<2>\nEntertainment<3>"
+     }]
    }
    ```
 
 3. **Next Request to Click an Option:**
-
    ```json
    {
      "thoughts": ["I should check the tech news section."],
      "commands": [],
-     "browser_actions": [
-       {
-         "action": "click",
-         "target": "1"
-       }
-     ]
+     "browser_action": {
+       "action": "click",
+       "target": "1"
+     }
    }
    ```
 
 4. **Subsequent Response from the System:**
-
    ```json
    {
      "timestamp": "2023-10-01T12:35:10.123Z",
      "results": [],
-     "browser_results": [
-       {
-         "url": "https://news.example.com/tech",
-         "content": "Latest Tech News...\n1. AI Breakthrough\n2. New Smartphone Release",
-         "options": [
-           {"number": 1, "text": "AI Breakthrough", "href": "/tech/ai-breakthrough"},
-           {"number": 2, "text": "New Smartphone Release", "href": "/tech/new-smartphone"}
-         ]
-       }
-     ]
+     "browser_results": [{
+       "url": "https://news.example.com/tech",
+       "content": "Latest Tech News...\nAI Breakthrough<1>\nNew Smartphone Release<2>"
+     }]
    }
    ```
 
@@ -166,10 +152,10 @@ You will interact with the VM using the following JSON schema:
 **Best Practices:**
 
 - **Browser Interaction:**
-  - **Sequence Actions Properly:** Always navigate to a page before attempting to click on page elements.
-  - **Reference Correct Elements:** Use the `number` provided in the `options` array to reference clickable elements accurately.
-  - **Limit Actions Per Request:** Include up to 5 `browser_actions` per request to maintain efficiency.
-  - **Avoid Unnecessary Commands:** Prefer using `browser_actions` for web interactions instead of shell commands.
+  - **One Action at a Time:** Each request can contain only one browser action (navigate or click) or none.
+  - **Sequential Actions:** Always navigate to a page before attempting to click on page elements.
+  - **Reference Elements Correctly:** Use the numbers shown in `<>` brackets in the page content to reference clickable elements.
+  - **Avoid Unnecessary Commands:** Prefer using browser actions for web interactions instead of shell commands.
 
 - **Command Execution:**
   - **Batch Commands Wisely:** Group related commands together, ensuring they execute in the correct order.

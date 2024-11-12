@@ -204,72 +204,52 @@ def main():
 
         # Process browser actions
         browser_results = []
-        for action in request.browser_actions:
+        if request.browser_action:
+            action = request.browser_action
             if action.action == "navigate":
-                # Prompt the user for confirmation
                 execute_action = get_user_confirmation(f"Navigate to URL '{action.target}'?", default='y')
                 if not execute_action:
                     logging.info(f"Skipping navigation to '{action.target}'")
                     browser_results.append(BrowserResponse(
                         url=action.target,
-                        content='Navigation skipped by user',
-                        options=[]
+                        content='Navigation skipped by user'
                     ))
-                    continue
-                logging.info(f"Navigating to URL '{action.target}'...")
-                try:
-                    browser.navigate_to_url(action.target)
-                    page_content = browser.get_page_content()
-                    options = browser.get_options()
-                    browser_response = BrowserResponse(
-                        url=browser.page.url,
-                        content=page_content,
-                        options=options
-                    )
-                    browser_results.append(browser_response)
-                except Exception as e:
-                    logging.error(f"Error navigating to URL '{action.target}': {e}")
-                    browser_results.append(BrowserResponse(
-                        url=action.target,
-                        content=f"Error loading website: {e}",
-                        options=[]
-                    ))
+                else:
+                    logging.info(f"Navigating to URL '{action.target}'...")
+                    try:
+                        browser.navigate_to_url(action.target)
+                        browser_results.append(BrowserResponse(
+                            url=browser.page.url,
+                            content=browser.get_page_content()
+                        ))
+                    except Exception as e:
+                        logging.error(f"Error navigating to URL '{action.target}': {e}")
+                        browser_results.append(BrowserResponse(
+                            url=action.target,
+                            content=f"Error loading website: {e}"
+                        ))
             elif action.action == "click":
-                # Prompt the user for confirmation
                 execute_action = get_user_confirmation(f"Click element '{action.target}'?", default='y')
                 if not execute_action:
                     logging.info(f"Skipping click on element '{action.target}'")
                     browser_results.append(BrowserResponse(
                         url=browser.page.url,
-                        content='Click action skipped by user',
-                        options=[]
+                        content='Click action skipped by user'
                     ))
-                    continue
-                logging.info(f"Clicking element '{action.target}'...")
-                try:
-                    browser.click_element(int(action.target))
-                    page_content = browser.get_page_content()
-                    options = browser.get_options()
-                    browser_response = BrowserResponse(
-                        url=browser.page.url,
-                        content=page_content,
-                        options=options
-                    )
-                    browser_results.append(browser_response)
-                except Exception as e:
-                    logging.error(f"Error clicking element '{action.target}': {e}")
-                    browser_results.append(BrowserResponse(
-                        url=browser.page.url,
-                        content=f"Error clicking element: {e}",
-                        options=[]
-                    ))
-            else:
-                logging.warning(f"Unknown browser action '{action.action}'")
-                browser_results.append(BrowserResponse(
-                    url=browser.page.url,
-                    content=f"Unknown browser action '{action.action}'",
-                    options=[]
-                ))
+                else:
+                    logging.info(f"Clicking element '{action.target}'...")
+                    try:
+                        browser.click_element(int(action.target))
+                        browser_results.append(BrowserResponse(
+                            url=browser.page.url,
+                            content=browser.get_page_content()
+                        ))
+                    except Exception as e:
+                        logging.error(f"Error clicking element '{action.target}': {e}")
+                        browser_results.append(BrowserResponse(
+                            url=browser.page.url,
+                            content=f"Error clicking element: {e}"
+                        ))
 
         # Build Response object
         response_obj = Response(

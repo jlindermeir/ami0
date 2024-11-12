@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import json
+from pydantic import BaseModel, Field
+from typing import Optional, Union, Literal
 
 class CommandResponse(BaseModel):
     exit_code: int
@@ -20,63 +22,60 @@ class Response(BaseModel):
     results: list[CommandResponse]
     browser_results: list[BrowserResponse]
 
-class BrowserAction(BaseModel):
-    action: str  # e.g., "navigate", "click"
-    target: str  # URL for "navigate", element number for "click"
+class NavigateAction(BaseModel):
+    action: Literal["navigate"] = "navigate"
+    target: str = Field(description="URL to navigate to")
+    
+    model_config = {
+        "extra": "forbid"
+    }
+
+class ClickAction(BaseModel):
+    action: Literal["click"] = "click"
+    target: str = Field(description="Element number to click")
+    
+    model_config = {
+        "extra": "forbid"
+    }
 
 class Request(BaseModel):
-    thoughts: list[str]
-    commands: list[str]
-    browser_actions: list[BrowserAction]
+    thoughts: list[str] = Field(
+        description="List of the assistant's thoughts related to the task"
+    )
+    commands: list[str] = Field(
+        description="List of commands to execute on the server via SSH"
+    )
+    browser_action: Optional[Union[NavigateAction, ClickAction]] = Field(
+        description="Single browser action to perform (navigate or click) or null if none"
+    )
+    
+    model_config = {
+        "extra": "forbid"
+    }
+
+# Generate the schema from the model and ensure additionalProperties: false at all levels
+base_schema = Request.model_json_schema()
+
+def add_additional_properties_false(schema):
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            schema["additionalProperties"] = False
+            if "properties" in schema:
+                schema["required"] = list(schema["properties"].keys())
+        for value in schema.values():
+            add_additional_properties_false(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            add_additional_properties_false(item)
+    return schema
+
+base_schema = add_additional_properties_false(base_schema)
 
 request_json_schema = {
     "type": "json_schema",
     "json_schema": {
         "name": "executionRequest",
         "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "thoughts": {
-                    "type": "array",
-                    "description": "List of the assistant's thoughts related to the task",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "commands": {
-                    "type": "array",
-                    "description": "List of commands to execute on the server via SSH",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "browser_actions": {
-                    "type": "array",
-                    "description": "List of browser actions to perform",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "action": {
-                                "type": "string",
-                                "description": "The browser action to perform, e.g., 'navigate', 'click'"
-                            },
-                            "target": {
-                                "type": "string",
-                                "description": "The target of the action, e.g., URL for 'navigate', element number for 'click'"
-                            }
-                        },
-                        "required": ["action", "target"],
-                        "additionalProperties": False
-                    }
-                }
-            },
-            "required": [
-                "thoughts",
-                "commands",
-                "browser_actions"
-            ],
-            "additionalProperties": False
-        }
+        "schema": base_schema
     }
 }
