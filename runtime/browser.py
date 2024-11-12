@@ -58,17 +58,13 @@ class TextBasedBrowser:
                 "(el, num) => { el.textContent = el.textContent.trim() + ' <' + num + '>'; }", 
                 option_number
             )
-        return elements
 
-    def get_page_text(self):
+    def get_annotated_page_content(self):
         """Get the text content of the page after annotation."""
+        self.annotate_clickable_elements()
         body_text = self.page.evaluate("document.body.innerText")
         logging.debug("Page text retrieved.")
         return body_text
-
-    def get_page_content(self):
-        """Get the text content of the page."""
-        return self.get_page_text()
 
     def click_element(self, element_number):
         """Click the element with the specified option number."""

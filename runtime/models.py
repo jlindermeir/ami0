@@ -15,7 +15,6 @@ class BrowserOption(BaseModel):
 class BrowserResponse(BaseModel):
     url: str
     content: str
-    options: list[BrowserOption]
 
 class Response(BaseModel):
     timestamp: str

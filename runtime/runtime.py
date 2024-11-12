@@ -24,7 +24,7 @@ with open(system_prompt_file_path, "r") as f:
     system_prompt = f.read()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 
@@ -220,7 +220,7 @@ def main():
                         browser.navigate_to_url(action.target)
                         browser_results.append(BrowserResponse(
                             url=browser.page.url,
-                            content=browser.get_page_content()
+                            content=browser.get_annotated_page_content()
                         ))
                     except Exception as e:
                         logging.error(f"Error navigating to URL '{action.target}': {e}")
@@ -242,7 +242,7 @@ def main():
                         browser.click_element(int(action.target))
                         browser_results.append(BrowserResponse(
                             url=browser.page.url,
-                            content=browser.get_page_content()
+                            content=browser.get_annotated_page_content()
                         ))
                     except Exception as e:
                         logging.error(f"Error clicking element '{action.target}': {e}")
