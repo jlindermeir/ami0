@@ -24,7 +24,7 @@ with open(system_prompt_file_path, "r") as f:
     system_prompt = f.read()
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 
