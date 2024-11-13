@@ -183,13 +183,8 @@ def main():
 
     # Conversation history
     conversation = []
-
-    # Initial system prompt
     conversation.append({"role": "system", "content": system_prompt})
-
-    # Initial user message to start the conversation
-    user_message = "Please provide the next set of commands."
-    conversation.append({"role": "user", "content": user_message})
+    conversation.append({"role": "user", "content": "Please provide the next set of commands."})
 
     # Initialize OpenAI client
     oai_client = OpenAI()
@@ -200,9 +195,9 @@ def main():
         num_tokens = len(ENCODING.encode(conversation_json))
         logging.info(f"Current conversation uses {num_tokens} tokens")
 
-        # Send the conversation to the model
+        # Send the conversation to the model and get parsed response
         try:
-            response = oai_client.beta.chat.completions.parse(
+            completion = oai_client.beta.chat.completions.parse(
                 model=OPENAI_MODEL,
                 messages=conversation,
                 temperature=1,
@@ -212,38 +207,13 @@ def main():
                 presence_penalty=0,
                 response_format=Request
             )
+            request = completion.choices[0].message.parsed
+            conversation.append({"role": "assistant", "content": completion.choices[0].message.content})
+            
         except openai.RateLimitError as e:
             logging.error(f"OpenAI API rate limit reached: {e}")
-
-            # Remove the last response from the conversation and add an error note
             conversation.pop()
             conversation.append({"role": "system", "content": "OpenAI API rate limit reached. Please try producing shorter output."})
-            continue
-
-        # Get the assistant's reply
-        assistant_reply = response.choices[0].message.content
-
-        # Append assistant's reply to conversation
-        conversation.append({"role": "assistant", "content": assistant_reply})
-
-        # Log assistant's reply
-        logging.debug("Assistant's reply:")
-        logging.debug(assistant_reply)
-
-        # Parse assistant_reply into Request object
-        try:
-            # Remove code blocks if any
-            if assistant_reply.startswith("```"):
-                assistant_reply = assistant_reply.strip("```")
-            # Parse JSON
-            assistant_reply_json = json.loads(assistant_reply)
-            request = Request(**assistant_reply_json)
-        except Exception as e:
-            logging.error("Error parsing assistant's reply into Request object: %s", e)
-            logging.error("Assistant's reply was: %s", assistant_reply)
-            # Handle error, perhaps send an error message to assistant
-            error_message = f"Error parsing your response: {e}. Please make sure to respond in the correct JSON format."
-            conversation.append({"role": "system", "content": error_message})
             continue
 
         # Output the thoughts to logs
@@ -255,32 +225,21 @@ def main():
         command_results = execute_commands(request.commands, ssh_config)
         browser_result = handle_browser_action(request.browser_action, browser)
 
-        # Build Response object
+        # Build Response object and add to conversation
         response_obj = Response(
             timestamp=datetime.datetime.now().isoformat(),
             results=command_results,
             browser_result=browser_result
         )
+        conversation.append({"role": "user", "content": json.dumps(response_obj.model_dump(), indent=2)})
 
-        # Append the formatted response to the conversation
-        response_json = json.dumps(response_obj.model_dump(), indent=2)
-        conversation.append({"role": "user", "content": response_json})
-
-        # Log the response
-        logging.debug("Response sent to assistant:")
-        logging.debug(response_json)
-
-        # Proceed to next iteration
+        # Handle user input
         user_input = input(
             "Enter a message to send to the assistant, or 'q' to quit. Press Enter to continue without message: ").strip()
         if user_input.lower() == 'q':
             break
         elif user_input:
-            # User provided a message
             conversation.append({"role": "system", "content": user_input})
-        else:
-            # No message, proceed
-            pass
 
     # Close the browser at the end
     browser.close()
