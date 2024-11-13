@@ -27,11 +27,14 @@ with open(system_prompt_file_path, "r") as f:
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 
-OPENAI_MODEL = "gpt-4o"
+OPENAI_MODEL = "gpt-4o-mini"
 ENCODING = tiktoken.encoding_for_model(OPENAI_MODEL)
+SKIP_CONFIRMATIONS = True
 
-
-def get_user_confirmation(prompt, default='y'):
+def get_user_confirmation(prompt, default='y', force_prompt=False):
+    if SKIP_CONFIRMATIONS and not force_prompt:
+        return True
+        
     valid_yes = ['y', 'yes']
     valid_no = ['n', 'no']
     prompt = f"{prompt} [{'Y/n' if default.lower() == 'y' else 'y/N'}]: "
@@ -203,6 +206,11 @@ def main():
     # Initialize OpenAI client
     oai_client = OpenAI()
 
+    # Add initial confirmation before the main loop
+    if not get_user_confirmation("Start automated execution?", default='y', force_prompt=True):
+        logging.info("Execution cancelled by user")
+        return
+
     while True:
         # Count tokens for the entire conversation as JSON
         conversation_json = json.dumps(conversation)
@@ -295,12 +303,13 @@ def main():
         conversation.append(next_message)
 
         # Handle user input
-        user_input = input(
-            "Enter a message to send to the assistant, or 'q' to quit. Press Enter to continue without message: ").strip()
-        if user_input.lower() == 'q':
-            break
-        elif user_input:
-            conversation.append({"role": "system", "content": user_input})
+        if not SKIP_CONFIRMATIONS:
+            user_input = input(
+                "Enter a message to send to the assistant, or 'q' to quit. Press Enter to continue without message: ").strip()
+            if user_input.lower() == 'q':
+                break
+            elif user_input:
+                conversation.append({"role": "system", "content": user_input})
 
     # Close the browser at the end
     browser.close()

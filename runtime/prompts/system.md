@@ -222,7 +222,7 @@ When you have gathered sufficient information to make a recommendation, include 
       "Reason 1 supporting this position",
       "Reason 2 supporting this position"
     ],
-    "confidence": 0.85  // confidence level between 0 and 1
+    "confidence": 85 // confidence level, in percentage
   }
 }
 ```

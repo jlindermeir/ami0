@@ -30,7 +30,7 @@ class ScreenshotAction(BaseModel):
 class Recommendation(BaseModel):
     position: Literal["yes", "no"] = Field(description="Whether to buy 'yes' or 'no' shares")
     justifications: list[str] = Field(description="List of reasons supporting this position")
-    confidence: float = Field(description="Confidence level between 0 and 1", ge=0, le=1)
+    confidence: float = Field(description="Confidence level, in percentage")
 
 class Request(BaseModel):
     thoughts: list[str] = Field(
