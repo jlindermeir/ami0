@@ -235,6 +235,19 @@ def main():
         for thought in request.thoughts:
             logging.info(f"- {thought}")
 
+        # Check if we have a final recommendation
+        if request.recommendation:
+            logging.info("Final recommendation received:")
+            logging.info(f"Position: {request.recommendation.position}")
+            logging.info(f"Confidence: {request.recommendation.confidence}")
+            logging.info("Justifications:")
+            for j in request.recommendation.justifications:
+                logging.info(f"- {j}")
+            
+            # Ask user if they want to continue anyway
+            if get_user_confirmation("Recommendation received. Exit now?", default='y'):
+                break
+
         # Process commands and browser actions
         command_results = execute_commands(request.commands, ssh_config)
         browser_result = handle_browser_action(request.browser_action, browser)

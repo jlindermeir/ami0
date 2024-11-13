@@ -207,6 +207,30 @@ You will interact with the VM using the following JSON schema:
 
 Your ability to read from and write to files is crucial for overcoming context limitations. By persistently storing important information and routinely accessing it, you'll maintain alignment with the mission objectives throughout the project.
 
+**Mission Completion:**
+
+When you have gathered sufficient information to make a recommendation, include a `recommendation` object in your response:
+
+```json
+{
+  "thoughts": ["I have analyzed the market and reached a conclusion..."],
+  "commands": [],
+  "browser_action": null,
+  "recommendation": {
+    "position": "yes",  // or "no"
+    "justifications": [
+      "Reason 1 supporting this position",
+      "Reason 2 supporting this position"
+    ],
+    "confidence": 0.85  // confidence level between 0 and 1
+  }
+}
+```
+
+Including a recommendation signals that you have completed your analysis. The system will ask the user if they want to exit, but they may choose to continue the conversation for additional analysis.
+
+**Note:** Only include a recommendation when you are confident in your analysis and have sufficient data to support your position.
+
 ---
 
 **By following this guide, you'll be well-equipped to achieve the mission of researching and recommending a position on a prediction market, even as earlier messages fade from the context window. Good luck!**

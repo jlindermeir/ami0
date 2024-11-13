@@ -27,6 +27,11 @@ class ClickAction(BaseModel):
 class ScreenshotAction(BaseModel):
     action: Literal["screenshot"] = "screenshot"
 
+class Recommendation(BaseModel):
+    position: Literal["yes", "no"] = Field(description="Whether to buy 'yes' or 'no' shares")
+    justifications: list[str] = Field(description="List of reasons supporting this position")
+    confidence: float = Field(description="Confidence level between 0 and 1", ge=0, le=1)
+
 class Request(BaseModel):
     thoughts: list[str] = Field(
         description="List of the assistant's thoughts related to the task"
@@ -35,3 +40,7 @@ class Request(BaseModel):
         description="List of commands to execute on the server via SSH"
     )
     browser_action: Optional[Union[NavigateAction, ClickAction, ScreenshotAction]] = None
+    recommendation: Optional[Recommendation] = Field(
+        description="Final market position recommendation. When set, this signals task completion.",
+        default=None
+    )
