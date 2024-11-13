@@ -1,5 +1,6 @@
 import logging
 from urllib.parse import urljoin
+import pathlib
 
 from playwright.sync_api import sync_playwright, TimeoutError
 
@@ -17,6 +18,9 @@ class TextBasedBrowser:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/116.0.0.0 Safari/537.36"
         )
+        self.screenshot_path = pathlib.Path(__file__).parent / "data" / "latest_screenshot.png"
+        # Ensure the directory exists
+        self.screenshot_path.parent.mkdir(parents=True, exist_ok=True)
 
     def setup_browser(self):
         """Set up the Playwright browser and context with a custom user agent."""
@@ -102,6 +106,15 @@ class TextBasedBrowser:
     def run(self):
         """Run the text-based browser (not used in integration)."""
         pass  # Removed interactive loop for integration
+
+    def take_screenshot(self) -> bool:
+        """Take a screenshot and return success status."""
+        try:
+            self.page.screenshot(path=str(self.screenshot_path))
+            return True
+        except Exception as e:
+            logging.error(f"Error taking screenshot: {e}")
+            return False
 
 
 if __name__ == '__main__':

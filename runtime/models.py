@@ -9,6 +9,7 @@ class CommandResponse(BaseModel):
 class BrowserResponse(BaseModel):
     url: str
     content: str
+    has_screenshot: bool = False
 
 class Response(BaseModel):
     timestamp: str
@@ -23,6 +24,9 @@ class ClickAction(BaseModel):
     action: Literal["click"] = "click"
     target: str = Field(description="Element number to click")
 
+class ScreenshotAction(BaseModel):
+    action: Literal["screenshot"] = "screenshot"
+
 class Request(BaseModel):
     thoughts: list[str] = Field(
         description="List of the assistant's thoughts related to the task"
@@ -30,6 +34,4 @@ class Request(BaseModel):
     commands: list[str] = Field(
         description="List of commands to execute on the server via SSH"
     )
-    browser_action: Optional[Union[NavigateAction, ClickAction]] = Field(
-        description="Single browser action to perform (navigate or click) or null if none"
-    )
+    browser_action: Optional[Union[NavigateAction, ClickAction, ScreenshotAction]] = None

@@ -41,7 +41,7 @@ You will interact with the VM using the following JSON schema:
   "thoughts": ["Your thoughts related to the task."],
   "commands": ["command_1", "command_2", "...additional commands"],
   "browser_action": {
-    "action": "navigate" | "click",
+    "action": "navigate" | "click" | "screenshot",
     "target": "URL_to_navigate" | "element_number"
   }
 }
@@ -62,6 +62,12 @@ You will interact with the VM using the following JSON schema:
     {
       "action": "click",
       "target": "1"
+    }
+    ```
+  - A screenshot action:
+    ```json
+    {
+      "action": "screenshot"
     }
     ```
   - Or `null` if no browser action is needed
@@ -93,6 +99,20 @@ You will interact with the VM using the following JSON schema:
        "browser_action": {
          "action": "click",
          "target": "1"
+       }
+     }
+     ```
+
+3. **Take Screenshots:**
+   - Use the `"screenshot"` action to capture the current page state
+   - The screenshot will be provided back to you for visual analysis
+   - Example:
+     ```json
+     {
+       "thoughts": ["I should capture this page for analysis"],
+       "commands": [],
+       "browser_action": {
+         "action": "screenshot"
        }
      }
      ```

@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import pathlib
+import base64
 
 import openai
 import paramiko
@@ -132,7 +133,7 @@ def execute_commands(commands, ssh_config):
     return command_results
 
 def handle_browser_action(browser_action, browser):
-    """Handle browser actions (navigation and clicks)."""
+    """Handle browser actions (navigation, clicks, and screenshots)."""
     if not browser_action:
         return None
 
@@ -164,6 +165,19 @@ def handle_browser_action(browser_action, browser):
         except Exception as e:
             logging.error(f"Error clicking element '{action.target}': {e}")
             return BrowserResponse(url=browser.page.url, content=f"Error clicking element: {e}")
+    elif action.action == "screenshot":
+        logging.info("Taking screenshot of current page...")
+        success = browser.take_screenshot()
+        return BrowserResponse(
+            url=browser.page.url,
+            content=browser.get_annotated_page_content(),
+            has_screenshot=success
+        )
+
+def encode_image(image_path):
+    """Encode image as base64 string."""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 def main():
     # SSH configuration
@@ -225,13 +239,47 @@ def main():
         command_results = execute_commands(request.commands, ssh_config)
         browser_result = handle_browser_action(request.browser_action, browser)
 
-        # Build Response object and add to conversation
+        # Build Response object
         response_obj = Response(
             timestamp=datetime.datetime.now().isoformat(),
             results=command_results,
             browser_result=browser_result
         )
-        conversation.append({"role": "user", "content": json.dumps(response_obj.model_dump(), indent=2)})
+
+        # Create the next message content
+        if browser_result and browser_result.has_screenshot:
+            # If we have a screenshot, create a multi-part message with base64 encoding
+            try:
+                base64_image = encode_image(browser.screenshot_path)
+                next_message = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(response_obj.model_dump(), indent=2)
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            except Exception as e:
+                logging.error(f"Error encoding screenshot: {e}")
+                next_message = {
+                    "role": "user",
+                    "content": json.dumps(response_obj.model_dump(), indent=2)
+                }
+        else:
+            # Otherwise, just send the regular JSON response
+            next_message = {
+                "role": "user",
+                "content": json.dumps(response_obj.model_dump(), indent=2)
+            }
+
+        conversation.append(next_message)
 
         # Handle user input
         user_input = input(
