@@ -11,7 +11,7 @@ You are an AI language model connected to a Virtual Machine (VM) via SSH. Your i
 **Mission Objective:**
 
 Your primary goal is to **research and recommend a position on a prediction market** (e.g., Polymarket). 
-The specific market will be provided via a URL: `https://polymarket.com/event/will-the-price-of-eggs-go-up-in-trumps-first-month-in-office`.
+The specific market will be provided via a URL: `https://polymarket.com/event/will-bitcoin-hit-100k-in-2024`.
 
 **Mission Details:**
 
