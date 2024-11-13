@@ -12,10 +12,8 @@ from runtime.models import (
     CommandResponse,
     BrowserResponse,
     Request,
-    Response,
-    request_json_schema
+    Response
 )
-
 from runtime.browser import TextBasedBrowser
 
 # Read the system prompt
@@ -136,7 +134,7 @@ def main():
     while True:
         # Send the conversation to the model
         try:
-            response = oai_client.chat.completions.create(
+            response = oai_client.beta.chat.completions.parse(
                 model="gpt-4o",
                 messages=conversation,
                 temperature=1,
@@ -144,7 +142,7 @@ def main():
                 top_p=1,
                 frequency_penalty=0,
                 presence_penalty=0,
-                response_format=request_json_schema
+                response_format=Request
             )
         except openai.RateLimitError as e:
             logging.error(f"OpenAI API rate limit reached: {e}")
