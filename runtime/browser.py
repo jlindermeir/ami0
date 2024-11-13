@@ -1,7 +1,6 @@
 import logging
 from urllib.parse import urljoin
 
-import tiktoken
 from playwright.sync_api import sync_playwright, TimeoutError
 
 
@@ -89,13 +88,6 @@ class TextBasedBrowser:
             except Exception as e:
                 logging.error(f"Error clicking the element: {e}")
                 raise
-
-    def count_tokens(self, text):
-        """Count the number of tokens in the text using tiktoken."""
-        encoding = tiktoken.encoding_for_model("gpt-4")
-        tokens = encoding.encode(text)
-        logging.info(f"Number of tokens in page text: {len(tokens)}")
-        return len(tokens)
 
     def close(self):
         """Close browser resources."""
