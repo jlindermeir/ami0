@@ -108,15 +108,74 @@ def execute_ssh_command(host, port, username, password, command):
     return cmd_response
 
 
+def execute_commands(commands, ssh_config):
+    """Execute a list of commands via SSH after user confirmation."""
+    command_results = []
+    for command in commands:
+        execute_command = get_user_confirmation(f"Execute command '{command}'?", default='y')
+        if not execute_command:
+            logging.info(f"Skipping command '{command}'")
+            command_results.append(CommandResponse(exit_code=-1, stdout="", stderr="Command skipped by user"))
+            continue
+
+        logging.info(f"Executing command '{command}' via SSH...")
+        cmd_result = execute_ssh_command(
+            ssh_config['host'], 
+            ssh_config['port'], 
+            ssh_config['username'], 
+            ssh_config['password'], 
+            command
+        )
+        logging.info(f"Exit code: {cmd_result.exit_code}")
+        command_results.append(cmd_result)
+    
+    return command_results
+
+def handle_browser_action(browser_action, browser):
+    """Handle browser actions (navigation and clicks)."""
+    if not browser_action:
+        return None
+
+    action = browser_action
+    if action.action == "navigate":
+        execute_action = get_user_confirmation(f"Navigate to URL '{action.target}'?", default='y')
+        if not execute_action:
+            logging.info(f"Skipping navigation to '{action.target}'")
+            return BrowserResponse(url=action.target, content='Navigation skipped by user')
+        
+        logging.info(f"Navigating to URL '{action.target}'...")
+        try:
+            browser.navigate_to_url(action.target)
+            return BrowserResponse(url=browser.page.url, content=browser.get_annotated_page_content())
+        except Exception as e:
+            logging.error(f"Error navigating to URL '{action.target}': {e}")
+            return BrowserResponse(url=action.target, content=f"Error loading website: {e}")
+            
+    elif action.action == "click":
+        execute_action = get_user_confirmation(f"Click element '{action.target}'?", default='y')
+        if not execute_action:
+            logging.info(f"Skipping click on element '{action.target}'")
+            return BrowserResponse(url=browser.page.url, content='Click action skipped by user')
+        
+        logging.info(f"Clicking element '{action.target}'...")
+        try:
+            browser.click_element(int(action.target))
+            return BrowserResponse(url=browser.page.url, content=browser.get_annotated_page_content())
+        except Exception as e:
+            logging.error(f"Error clicking element '{action.target}': {e}")
+            return BrowserResponse(url=browser.page.url, content=f"Error clicking element: {e}")
+
 def main():
     # SSH configuration
-    ssh_host = os.getenv("SSH_HOST", "localhost")
-    ssh_port = int(os.getenv("SSH_PORT", 2222))
-    ssh_username = os.getenv("SSH_USERNAME", "root")
-    ssh_password = os.getenv("SSH_PASSWORD", "DockerPass")
+    ssh_config = {
+        'host': os.getenv("SSH_HOST", "localhost"),
+        'port': int(os.getenv("SSH_PORT", 2222)),
+        'username': os.getenv("SSH_USERNAME", "root"),
+        'password': os.getenv("SSH_PASSWORD", "DockerPass")
+    }
 
     # Log initial configuration
-    logging.info(f"SSH configuration: host={ssh_host}, port={ssh_port}, username={ssh_username}")
+    logging.info(f"SSH configuration: host={ssh_config['host']}, port={ssh_config['port']}, username={ssh_config['username']}")
 
     # Initialize the text-based browser
     browser = TextBasedBrowser()
@@ -192,71 +251,9 @@ def main():
         for thought in request.thoughts:
             logging.info(f"- {thought}")
 
-        # Process commands
-        command_results = []
-        for command in request.commands:
-            # Prompt the user for confirmation if the command should be executed.
-            execute_command = get_user_confirmation(f"Execute command '{command}'?", default='y')
-            if not execute_command:
-                logging.info(f"Skipping command '{command}'")
-                command_results.append(CommandResponse(exit_code=-1, stdout="", stderr="Command skipped by user"))
-                continue
-
-            # Execute the command via SSH
-            logging.info(f"Executing command '{command}' via SSH...")
-            cmd_result = execute_ssh_command(ssh_host, ssh_port, ssh_username, ssh_password, command)
-
-            logging.info(f"Exit code: {cmd_result.exit_code}")
-            command_results.append(cmd_result)
-
-        # Process browser actions
-        browser_result = None  # Initialize as None
-        if request.browser_action:
-            action = request.browser_action
-            if action.action == "navigate":
-                execute_action = get_user_confirmation(f"Navigate to URL '{action.target}'?", default='y')
-                if not execute_action:
-                    logging.info(f"Skipping navigation to '{action.target}'")
-                    browser_result = BrowserResponse(
-                        url=action.target,
-                        content='Navigation skipped by user'
-                    )
-                else:
-                    logging.info(f"Navigating to URL '{action.target}'...")
-                    try:
-                        browser.navigate_to_url(action.target)
-                        browser_result = BrowserResponse(
-                            url=browser.page.url,
-                            content=browser.get_annotated_page_content()
-                        )
-                    except Exception as e:
-                        logging.error(f"Error navigating to URL '{action.target}': {e}")
-                        browser_result = BrowserResponse(
-                            url=action.target,
-                            content=f"Error loading website: {e}"
-                        )
-            elif action.action == "click":
-                execute_action = get_user_confirmation(f"Click element '{action.target}'?", default='y')
-                if not execute_action:
-                    logging.info(f"Skipping click on element '{action.target}'")
-                    browser_result = BrowserResponse(
-                        url=browser.page.url,
-                        content='Click action skipped by user'
-                    )
-                else:
-                    logging.info(f"Clicking element '{action.target}'...")
-                    try:
-                        browser.click_element(int(action.target))
-                        browser_result = BrowserResponse(
-                            url=browser.page.url,
-                            content=browser.get_annotated_page_content()
-                        )
-                    except Exception as e:
-                        logging.error(f"Error clicking element '{action.target}': {e}")
-                        browser_result = BrowserResponse(
-                            url=browser.page.url,
-                            content=f"Error clicking element: {e}"
-                        )
+        # Process commands and browser actions
+        command_results = execute_commands(request.commands, ssh_config)
+        browser_result = handle_browser_action(request.browser_action, browser)
 
         # Build Response object
         response_obj = Response(
