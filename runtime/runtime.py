@@ -7,6 +7,7 @@ import pathlib
 import openai
 import paramiko
 from openai import OpenAI
+import tiktoken
 
 from runtime.models import (
     CommandResponse,
@@ -24,6 +25,9 @@ with open(system_prompt_file_path, "r") as f:
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("paramiko").setLevel(logging.WARNING)
+
+OPENAI_MODEL = "gpt-4o"
+ENCODING = tiktoken.encoding_for_model(OPENAI_MODEL)
 
 
 def get_user_confirmation(prompt, default='y'):
@@ -132,10 +136,15 @@ def main():
     oai_client = OpenAI()
 
     while True:
+        # Count tokens for the entire conversation as JSON
+        conversation_json = json.dumps(conversation)
+        num_tokens = len(ENCODING.encode(conversation_json))
+        logging.info(f"Current conversation uses {num_tokens} tokens")
+
         # Send the conversation to the model
         try:
             response = oai_client.beta.chat.completions.parse(
-                model="gpt-4o",
+                model=OPENAI_MODEL,
                 messages=conversation,
                 temperature=1,
                 max_tokens=2048,
