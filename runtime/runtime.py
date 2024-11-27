@@ -27,9 +27,9 @@ with open(system_prompt_file_path, "r") as f:
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 
-OPENAI_MODEL = "gpt-4o-mini"
-ENCODING = tiktoken.encoding_for_model(OPENAI_MODEL)
-SKIP_CONFIRMATIONS = True
+OPENAI_MODEL = "o1-preview"
+ENCODING = tiktoken.encoding_for_model("gpt-4o")
+SKIP_CONFIRMATIONS = False
 
 def get_user_confirmation(prompt, default='y', force_prompt=False):
     if SKIP_CONFIRMATIONS and not force_prompt:
@@ -182,6 +182,18 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
+def parse_request_raw(request_raw: str) -> dict:
+    """Parse and clean the raw request text from potential JSON code block markers."""
+    # Remove JSON code block markers if present
+    cleaned_text = request_raw.strip()
+    if cleaned_text.startswith("```json"):
+        cleaned_text = cleaned_text[7:]
+    if cleaned_text.endswith("```"):
+        cleaned_text = cleaned_text[:-3]
+    
+    # Parse the cleaned JSON text
+    return json.loads(cleaned_text.strip())
+
 def main():
     # SSH configuration
     ssh_config = {
@@ -200,7 +212,7 @@ def main():
 
     # Conversation history
     conversation = []
-    conversation.append({"role": "system", "content": system_prompt})
+    conversation.append({"role": "user", "content": system_prompt})
     conversation.append({"role": "user", "content": "Please provide the next set of commands."})
 
     # Initialize OpenAI client
@@ -219,23 +231,28 @@ def main():
 
         # Send the conversation to the model and get parsed response
         try:
-            completion = oai_client.beta.chat.completions.parse(
+            completion = oai_client.chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=conversation,
-                temperature=1,
-                max_tokens=2048,
+                max_completion_tokens=32000,
                 top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0,
-                response_format=Request
+                # response_format=Request
             )
-            request = completion.choices[0].message.parsed
+            request_raw = completion.choices[0].message.content
+            logging.debug(f"Raw response: {request_raw}")
+            request = Request(**parse_request_raw(request_raw))
             conversation.append({"role": "assistant", "content": completion.choices[0].message.content})
             
         except openai.RateLimitError as e:
             logging.error(f"OpenAI API rate limit reached: {e}")
             conversation.pop()
-            conversation.append({"role": "system", "content": "OpenAI API rate limit reached. Please try producing shorter output."})
+            conversation.append({"role": "user", "content": "OpenAI API rate limit reached. Please try producing shorter output."})
+            continue
+
+        except Exception as e:
+            logging.error(f"Error parsing response: {e}")
+            conversation.pop()
+            conversation.append({"role": "user", "content": "Error parsing response: {e}. Please try again."})
             continue
 
         # Output the thoughts to logs
@@ -309,7 +326,7 @@ def main():
             if user_input.lower() == 'q':
                 break
             elif user_input:
-                conversation.append({"role": "system", "content": user_input})
+                conversation.append({"role": "user", "content": user_input})
 
     # Close the browser at the end
     browser.close()
