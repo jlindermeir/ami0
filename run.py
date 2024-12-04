@@ -2,10 +2,11 @@
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 from ami.os import OS
-from ami.apps.echo import EchoApp
+from ami.apps import EchoApp, SSHApp
 
 def setup_logging():
     """Configure detailed logging with both file and console output."""
@@ -36,21 +37,31 @@ def setup_logging():
     
     # Reduce noise from other libraries
     logging.getLogger('openai').setLevel(logging.INFO)
+    logging.getLogger('paramiko').setLevel(logging.WARNING)
     
     logging.info(f"Logging initialized. Log file: {log_file}")
 
 def main():
+    # Read environment variables from .env file
+    load_dotenv()
+    
     # Set up logging first
     setup_logging()
     
     # Set the model
     model = "gpt-4o-mini"
     
-    # Create and initialize the OS
-    os = OS(model=model)
+    # Read the user prompt
+    prompt_path = Path(__file__).parent / "prompts" / "system.md"
+    with open(prompt_path, 'r') as f:
+        user_prompt = f.read().strip()
     
-    # Register our Echo app
+    # Create and initialize the OS
+    os = OS(model=model, user_prompt=user_prompt)
+    
+    # Register our apps
     os.register_app(EchoApp())
+    os.register_app(SSHApp())
     
     try:
         # Start the main event loop
@@ -62,6 +73,4 @@ def main():
         raise
 
 if __name__ == "__main__":
-    # Read environment variables from .env file
-    load_dotenv()
     main()

@@ -31,6 +31,27 @@ class EchoApp(App):
             "Available effects: uppercase, lowercase, reverse, and alternating case."
         )
     
+    @property
+    def usage_prompt(self) -> str:
+        return f"""
+This is the Echo app. You can send messages and have them echoed back with different text effects.
+
+Available effects:
+- {TextEffect.UPPERCASE.value}: Converts text to UPPERCASE
+- {TextEffect.LOWERCASE.value}: Converts text to lowercase
+- {TextEffect.REVERSE.value}: Reverses the text
+- {TextEffect.ALTERNATING.value}: AlTeRnAtEs between upper and lower case
+
+Example action:
+{{
+    "type": "echo",
+    "message": "Hello World",
+    "effect": "uppercase"
+}}
+
+This would return: "HELLO WORLD"
+""".strip()
+    
     def get_action_models(self) -> List[Type[BaseModel]]:
         """Return the action models supported by this app."""
         return [EchoAction]

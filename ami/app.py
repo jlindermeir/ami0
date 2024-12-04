@@ -11,7 +11,14 @@ class App(ABC):
     @property
     @abstractmethod
     def description(self) -> str:
-        """Return a description of the app for the system prompt."""
+        """Return a brief description of the app for the home screen."""
+        pass
+    
+    @property
+    @abstractmethod
+    def usage_prompt(self) -> str:
+        """Return a detailed prompt explaining how to use the app.
+        This can be dynamic based on the app's current state."""
         pass
     
     @abstractmethod

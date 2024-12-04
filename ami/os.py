@@ -11,6 +11,28 @@ from .models import BaseResponse, LaunchAppAction, ExitAppAction
 # Create module-level logger
 logger = logging.getLogger(__name__)
 
+# OS system prompt that explains the app system
+OS_SYSTEM_PROMPT = """
+You are an autonomous AI agent operating in a structured environment with multiple apps.
+Each app provides specific functionality that you can use to achieve your goals.
+
+You can:
+- Launch apps from the home screen
+- Use app-specific actions when inside an app
+- Return to the home screen at any time
+
+Your responses must follow this format:
+{
+    "thoughts": ["thought1", "thought2", ...],  # Explain your reasoning
+    "action": {
+        "type": "action_type",
+        ...action specific fields...
+    }
+}
+
+The available actions depend on your current state (home screen or inside an app).
+""".strip()
+
 def get_user_confirmation(prompt: str, default: str = 'y') -> bool:
     """Get user confirmation for an action."""
     valid_yes = ['y', 'yes']
@@ -31,13 +53,26 @@ def get_user_confirmation(prompt: str, default: str = 'y') -> bool:
 class OS:
     """Main operating system class that manages apps and handles the event loop."""
     
-    def __init__(self, model: str = "gpt-4o-2024-08-06"):
+    def __init__(self, model: str = "gpt-4o-2024-08-06", user_prompt: Optional[str] = None):
         self.client = OpenAI()
         self.model = model
         self.apps: dict[str, App] = {}
         self.current_app: Optional[App] = None
         self.conversation: List[Dict[str, str]] = []
         self._app_enum: Optional[Type[Enum]] = None
+        
+        # Initialize conversation with prompts
+        if user_prompt:
+            self.conversation.append({
+                "role": "system",
+                "content": user_prompt
+            })
+        
+        self.conversation.append({
+            "role": "system",
+            "content": OS_SYSTEM_PROMPT
+        })
+        
         logger.info(f"Initialized OS with model: {model}")
     
     def _create_app_enum(self) -> Type[Enum]:
@@ -60,21 +95,14 @@ class OS:
     @property
     def system_prompt(self) -> str:
         """Generate the system prompt based on current state."""
-        base_prompt = (
-            "You are an autonomous AI agent operating in a structured environment. "
-            "Your task is to interact with the available apps to achieve your goals. "
-            "Your responses must follow the specified format exactly. "
-            "You should explain your reasoning in the thoughts array, with each step as a separate thought."
-        )
-        
         if self.current_app is None:
             # Home screen prompt
             app_list = "\n".join(f"- {name}: {app.description}" 
                                for name, app in self.apps.items())
-            prompt = f"{base_prompt}\n\nAvailable apps:\n{app_list}"
+            prompt = f"Available apps:\n{app_list}"
         else:
             # App-specific prompt
-            prompt = f"{base_prompt}\n\n{self.current_app.description}\n\nYou can return to the home screen by choosing to exit the app."
+            prompt = "You can return to the home screen by choosing to exit the app."
         
         logger.debug(f"Generated system prompt:\n{prompt}")
         return prompt
@@ -133,6 +161,13 @@ class OS:
                 return "Action denied by user"
                 
             self.current_app = self.apps[app_name]  # Will always exist due to enum
+            
+            # Add app usage prompt to conversation
+            self.conversation.append({
+                "role": "system",
+                "content": self.current_app.usage_prompt
+            })
+            
             logger.info(f"Launched app: {app_name}")
             return f"Launched app: {app_name}"
                 
@@ -200,7 +235,7 @@ class OS:
                     model=self.model,
                     messages=[
                         {"role": "system", "content": self.system_prompt},
-                        *self.conversation[-10:]  # Keep last 10 messages for context
+                        *self.conversation
                     ],
                     response_format=response_format,
                 )
@@ -222,12 +257,6 @@ class OS:
                 state = "Home Screen" if self.current_app is None else f"In {self.current_app.name}"
                 logger.info(f"Current state: {state}")
                 print(f"Current state: {state}")
-                
-                # Add prompt for next action
-                self.conversation.append({
-                    "role": "user",
-                    "content": "What would you like to do next? Please explain your reasoning."
-                })
                 
             except KeyboardInterrupt:
                 logger.info("Received shutdown signal")
