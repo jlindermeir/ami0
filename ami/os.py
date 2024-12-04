@@ -1,7 +1,6 @@
-from typing import Optional, Type, Union, List, Dict, Any
+from typing import Optional, Type, Union, List, Dict, Any, Literal
 import json
 import logging
-from enum import Enum
 from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
 
@@ -59,7 +58,6 @@ class OS:
         self.apps: dict[str, App] = {}
         self.current_app: Optional[App] = None
         self.conversation: List[Dict[str, str]] = []
-        self._app_enum: Optional[Type[Enum]] = None
         
         # Initialize conversation with prompts
         if user_prompt:
@@ -75,22 +73,10 @@ class OS:
         
         logger.info(f"Initialized OS with model: {model}")
     
-    def _create_app_enum(self) -> Type[Enum]:
-        """Create an enum of available apps."""
-        if not self.apps:
-            raise ValueError("No apps registered")
-        
-        # Create enum dynamically
-        return Enum('AvailableApps', {
-            app_name: app_name for app_name in self.apps.keys()
-        })
-    
     def register_app(self, app: App) -> None:
         """Register a new app with the system."""
         logger.info(f"Registering app: {app.name}")
         self.apps[app.name] = app
-        # Recreate enum when apps change
-        self._app_enum = self._create_app_enum()
     
     @property
     def system_prompt(self) -> str:
@@ -111,10 +97,17 @@ class OS:
     def current_response_format(self) -> Type[BaseModel]:
         """Get the current expected response format."""
         if self.current_app is None:
-            # In home screen, only allow launching apps with enum values
+            # In home screen, only allow launching apps with literal union
+            app_names = list(self.apps.keys())
+            if not app_names:
+                raise ValueError("No apps registered")
+            
+            # Create a union of literals for app names
+            AppNameType = Literal[tuple(app_names)]  # type: ignore
+            
             launch_action = create_model(
                 "LaunchAppAction",
-                app_name=(self._app_enum, Field(description="The app to launch")),
+                app_name=(AppNameType, Field(description="The app to launch")),
                 __base__=LaunchAppAction
             )
             
@@ -153,14 +146,14 @@ class OS:
         
         # Handle the response based on action type
         if action.type == "launch_app":
-            app_name = action.app_name.value  # Get string value from enum
+            app_name = action.app_name  # Now a string literal
             logger.info(f"Agent wants to launch app: {app_name}")
             # Ask for confirmation before launching app
             if not get_user_confirmation(f"Allow agent to launch app '{app_name}'?"):
                 logger.info("User denied app launch")
                 return "Action denied by user"
                 
-            self.current_app = self.apps[app_name]  # Will always exist due to enum
+            self.current_app = self.apps[app_name]  # Will always exist due to literal union
             
             # Add app usage prompt to conversation
             self.conversation.append({
@@ -206,7 +199,7 @@ class OS:
     
     def run(self):
         """Main event loop."""
-        if not self._app_enum:
+        if not self.apps:
             raise ValueError("No apps registered. Please register at least one app before running.")
             
         logger.info("Starting autonomous agent system")
@@ -223,7 +216,7 @@ class OS:
         while True:
             try:
                 # Log conversation state
-                logger.debug(f"Current conversation state:\n{json.dumps(self.conversation[-10:], indent=2)}")
+                logger.debug(f"Current conversation state:\n{json.dumps(self.conversation, indent=2)}")
                 
                 # Get next action from model
                 logger.info("Requesting next action from agent")
@@ -234,7 +227,6 @@ class OS:
                 completion = self.client.beta.chat.completions.parse(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": self.system_prompt},
                         *self.conversation
                     ],
                     response_format=response_format,
@@ -242,13 +234,22 @@ class OS:
                 
                 response = completion.choices[0].message.parsed
                 
+                # Add agent's response to conversation
+                self.conversation.append({
+                    "role": "assistant",
+                    "content": json.dumps({
+                        "thoughts": response.thoughts,
+                        "action": response.action.model_dump()
+                    }, indent=2)
+                })
+                
                 # Handle the action and get any results
                 result = self.handle_agent_action(response)
                 
                 # Add the result to the conversation if there was one
                 if result:
                     self.conversation.append({
-                        "role": "system",
+                        "role": "user",
                         "content": result
                     })
                     print(f"\nResult: {result}")
