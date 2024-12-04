@@ -205,7 +205,7 @@ class OS:
                 return self.current_app.handle_response(action)
             except Exception as e:
                 logger.error(f"Error executing app action: {str(e)}", exc_info=True)
-                raise
+                return (f"Error executing action: {str(e)}", None)
     
     def run(self):
         """Main event loop."""
@@ -257,10 +257,9 @@ class OS:
                 text, image = self.handle_agent_action(response)
                 
                 # Add the result to the conversation if there was one
-                if text:
-                    self.conversation.append(self._format_conversation_message(text, image))
-                    print(f"\nResult: {text}")
-                    
+                self.conversation.append(self._format_conversation_message(text, image))
+                print(f"\nResult: {text}")
+
                 if image:
                     print(f"[Image data: {len(image)} bytes]")
                 
@@ -275,7 +274,4 @@ class OS:
                 break
             except Exception as e:
                 logger.error(f"Error in main loop: {str(e)}", exc_info=True)
-                self.conversation.append({
-                    "role": "system",
-                    "content": f"Error occurred: {str(e)}"
-                })
+                break

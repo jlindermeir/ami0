@@ -98,7 +98,7 @@ For example, "Click here<1>" means you can click this element using element numb
 
         if not elements:
             logging.warning("No clickable links or buttons found.")
-            return []
+            return
 
         for i, element in enumerate(elements):
             option_number = i + 1
@@ -119,14 +119,14 @@ For example, "Click here<1>" means you can click this element using element numb
         logging.debug("Page text retrieved.")
         return body_text
     
-    def take_screenshot(self) -> Optional[str]:
+    def take_screenshot(self) -> Tuple[str, Optional[str]]:
         """Take a screenshot and return it as base64."""
         try:
             screenshot_bytes = self.page.screenshot()
-            return base64.b64encode(screenshot_bytes).decode('utf-8')
+            return (None, base64.b64encode(screenshot_bytes).decode('utf-8'))
         except Exception as e:
             logging.error(f"Error taking screenshot: {e}")
-            return None
+            raise
     
     def navigate_to_url(self, url: str) -> Tuple[str, Optional[str]]:
         """Navigate to the specified URL and return the page content."""
@@ -172,9 +172,7 @@ For example, "Click here<1>" means you can click this element using element numb
         elif isinstance(response, ClickAction):
             return self.click_element(response.element)
         elif isinstance(response, ScreenshotAction):
-            content = self.get_annotated_page_content()
-            screenshot = self.take_screenshot()
-            return (content, screenshot)
+            return self.take_screenshot()
         else:
             raise ValueError(f"Unknown action type: {type(response)}")
     
