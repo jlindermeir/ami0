@@ -5,6 +5,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from ami.os import OS
+from ami.apps.echo import EchoApp
 
 def setup_logging():
     """Configure detailed logging with both file and console output."""
@@ -45,10 +46,8 @@ def main():
     # Create and initialize the OS
     os = OS()
     
-    # TODO: Register apps here
-    # Example:
-    # from apps.browser import BrowserApp
-    # os.register_app(BrowserApp("browser"))
+    # Register our Echo app
+    os.register_app(EchoApp())
     
     try:
         # Start the main event loop

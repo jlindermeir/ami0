@@ -107,6 +107,10 @@ class OS:
             )
             logger.debug(f"Using app response format for {self.current_app.name}")
         
+        # Log the complete schema
+        schema = format.model_json_schema()
+        logger.debug(f"Response format schema:\n{json.dumps(schema, indent=2)}")
+        
         return format
     
     def handle_agent_action(self, response: Any) -> Optional[str]:
@@ -184,13 +188,17 @@ class OS:
                 
                 # Get next action from model
                 logger.info("Requesting next action from agent")
+                
+                # Get and log the current response format
+                response_format = self.current_response_format
+                
                 completion = self.client.beta.chat.completions.parse(
                     model="gpt-4o-2024-08-06",
                     messages=[
                         {"role": "system", "content": self.system_prompt},
                         *self.conversation[-10:]  # Keep last 10 messages for context
                     ],
-                    response_format=self.current_response_format,
+                    response_format=response_format,
                 )
                 
                 response = completion.choices[0].message.parsed
