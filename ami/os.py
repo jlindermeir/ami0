@@ -6,7 +6,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
 
 from .app import App
-from .models import LaunchAppResponse, ExitAppResponse
+from .models import BaseResponse, LaunchAppAction, ExitAppAction
 
 # Create module-level logger
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def get_user_confirmation(prompt: str, default: str = 'y') -> bool:
 class OS:
     """Main operating system class that manages apps and handles the event loop."""
     
-    def __init__(self, model: str):
+    def __init__(self, model: str = "gpt-4o-2024-08-06"):
         self.client = OpenAI()
         self.model = model
         self.apps: dict[str, App] = {}
@@ -64,7 +64,7 @@ class OS:
             "You are an autonomous AI agent operating in a structured environment. "
             "Your task is to interact with the available apps to achieve your goals. "
             "Your responses must follow the specified format exactly. "
-            "You should explain your reasoning in the thought field before taking any action."
+            "You should explain your reasoning in the thoughts array, with each step as a separate thought."
         )
         
         if self.current_app is None:
@@ -84,27 +84,26 @@ class OS:
         """Get the current expected response format."""
         if self.current_app is None:
             # In home screen, only allow launching apps with enum values
+            launch_action = create_model(
+                "LaunchAppAction",
+                app_name=(self._app_enum, Field(description="The app to launch")),
+                __base__=LaunchAppAction
+            )
+            
             format = create_model(
                 "HomeResponse",
-                thought=(str, Field(description="Your reasoning for this action")),
-                app_name=(self._app_enum, Field(description="The app to launch")),
-                __base__=LaunchAppResponse
+                action=(launch_action, Field(description="The action to take")),
+                __base__=BaseResponse
             )
             logger.debug("Using home screen response format")
         else:
-            # In app, allow either app-specific actions or exiting
-            app_format = self.current_app.current_response_format
-            exit_format = create_model(
-                "ExitWithThought",
-                thought=(str, Field(description="Your reasoning for this action")),
-                __base__=ExitAppResponse
-            )
+            # In app, allow app-specific actions or exiting
+            possible_actions = [*self.current_app.get_action_models(), ExitAppAction]
             
-            # Create a union of the app response and exit response
             format = create_model(
                 f"AppResponse",
-                thought=(str, Field(description="Your reasoning for this action")),
-                action=(Union[app_format, exit_format], Field(...)),
+                action=(Union[tuple(possible_actions)], Field(description="The action to take")),
+                __base__=BaseResponse
             )
             logger.debug(f"Using app response format for {self.current_app.name}")
         
@@ -118,11 +117,15 @@ class OS:
         """Handle an agent's action, returning any result from the app."""
         # Log the complete response for debugging
         logger.debug(f"Agent response:\n{response.model_dump_json(indent=2)}")
-        logger.info(f"Agent's thought: {response.thought}")
+        logger.info("Agent's thoughts:")
+        for i, thought in enumerate(response.thoughts, 1):
+            logger.info(f"  {i}. {thought}")
         
-        # Handle the response based on current state
-        if isinstance(response, LaunchAppResponse):
-            app_name = response.app_name.value  # Get string value from enum
+        action = response.action
+        
+        # Handle the response based on action type
+        if action.type == "launch_app":
+            app_name = action.app_name.value  # Get string value from enum
             logger.info(f"Agent wants to launch app: {app_name}")
             # Ask for confirmation before launching app
             if not get_user_confirmation(f"Allow agent to launch app '{app_name}'?"):
@@ -133,7 +136,7 @@ class OS:
             logger.info(f"Launched app: {app_name}")
             return f"Launched app: {app_name}"
                 
-        elif isinstance(response.action, ExitAppResponse):
+        elif action.type == "exit_app":
             logger.info(f"Agent wants to exit app: {self.current_app.name}")
             # Ask for confirmation before exiting app
             if not get_user_confirmation(f"Allow agent to exit app '{self.current_app.name}'?"):
@@ -151,7 +154,7 @@ class OS:
                 raise ValueError("No app is currently active")
                 
             # Ask for confirmation before executing app action
-            action_desc = str(response.action)  # Get string representation of the action
+            action_desc = str(action)  # Get string representation of the action
             logger.info(f"Agent wants to perform action in {self.current_app.name}: {action_desc}")
             
             if not get_user_confirmation(f"Allow agent to perform action in {self.current_app.name}?\nAction: {action_desc}"):
@@ -159,7 +162,7 @@ class OS:
                 return "Action denied by user"
             
             try:
-                result = self.current_app.handle_response(response.action)
+                result = self.current_app.handle_response(action)
                 logger.info(f"App action result: {result}")
                 return result
             except Exception as e:
