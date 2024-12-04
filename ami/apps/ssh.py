@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List, Type, Literal, Optional
+from typing import List, Type, Literal, Optional, Tuple
 import paramiko
 from pydantic import BaseModel, Field
 
@@ -148,7 +148,7 @@ You are connected as: {self.config['username']}@{self.config['host']}
             stderr=stderr_str
         )
     
-    def handle_response(self, response: SSHAction) -> str:
+    def handle_response(self, response: SSHAction) -> Tuple[str, Optional[str]]:
         """Execute the SSH commands and return the results."""
         results = []
         for command in response.commands:
@@ -173,4 +173,4 @@ You are connected as: {self.config['username']}@{self.config['host']}
                 ])
             output.append("")  # Empty line between commands
         
-        return "\n".join(output) 
+        return ("\n".join(output), None)

@@ -1,4 +1,4 @@
-from typing import Optional, Type, Union, List, Dict, Any, Literal
+from typing import Optional, Type, Union, List, Dict, Any, Tuple, Literal
 import json
 import logging
 from openai import OpenAI
@@ -57,7 +57,7 @@ class OS:
         self.model = model
         self.apps: dict[str, App] = {}
         self.current_app: Optional[App] = None
-        self.conversation: List[Dict[str, str]] = []
+        self.conversation: List[Dict[str, Any]] = []
         
         # Initialize conversation with prompts
         if user_prompt:
@@ -134,8 +134,20 @@ class OS:
         
         return format
     
-    def handle_agent_action(self, response: Any) -> Optional[str]:
-        """Handle an agent's action, returning any result from the app."""
+    def _format_conversation_message(self, text: str, image: Optional[str] = None) -> Dict[str, Any]:
+        """Format a message for the conversation, optionally including an image."""
+        if not image:
+            content = text
+        else:
+            content = [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image}"}}
+            ]
+        
+        return {"role": "user", "content": content}
+    
+    def handle_agent_action(self, response: Any) -> Tuple[str, Optional[str]]:
+        """Handle an agent's action, returning (text_response, optional_base64_image)."""
         # Log the complete response for debugging
         logger.debug(f"Agent response:\n{response.model_dump_json(indent=2)}")
         logger.info("Agent's thoughts:")
@@ -151,7 +163,7 @@ class OS:
             # Ask for confirmation before launching app
             if not get_user_confirmation(f"Allow agent to launch app '{app_name}'?"):
                 logger.info("User denied app launch")
-                return "Action denied by user"
+                return ("Action denied by user", None)
                 
             self.current_app = self.apps[app_name]  # Will always exist due to literal union
             
@@ -162,19 +174,19 @@ class OS:
             })
             
             logger.info(f"Launched app: {app_name}")
-            return f"Launched app: {app_name}"
+            return (f"Launched app: {app_name}", None)
                 
         elif action.type == "exit_app":
             logger.info(f"Agent wants to exit app: {self.current_app.name}")
             # Ask for confirmation before exiting app
             if not get_user_confirmation(f"Allow agent to exit app '{self.current_app.name}'?"):
                 logger.info("User denied app exit")
-                return "Action denied by user"
+                return ("Action denied by user", None)
                 
             app_name = self.current_app.name
             self.current_app = None
             logger.info(f"Exited app: {app_name}")
-            return "Returned to home screen"
+            return ("Returned to home screen", None)
             
         else:
             if self.current_app is None:
@@ -187,12 +199,10 @@ class OS:
             
             if not get_user_confirmation(f"Allow agent to perform action in {self.current_app.name}?\nAction: {action_desc}"):
                 logger.info("User denied app action")
-                return "Action denied by user"
+                return ("Action denied by user", None)
             
             try:
-                result = self.current_app.handle_response(action)
-                logger.info(f"App action result: {result}")
-                return result
+                return self.current_app.handle_response(action)
             except Exception as e:
                 logger.error(f"Error executing app action: {str(e)}", exc_info=True)
                 raise
@@ -216,7 +226,7 @@ class OS:
         while True:
             try:
                 # Log conversation state
-                logger.debug(f"Current conversation state:\n{json.dumps(self.conversation, indent=2)}")
+                logger.debug(f"Current conversation state:\n{json.dumps(self.conversation[-10:], indent=2)}")
                 
                 # Get next action from model
                 logger.info("Requesting next action from agent")
@@ -244,15 +254,15 @@ class OS:
                 })
                 
                 # Handle the action and get any results
-                result = self.handle_agent_action(response)
+                text, image = self.handle_agent_action(response)
                 
                 # Add the result to the conversation if there was one
-                if result:
-                    self.conversation.append({
-                        "role": "user",
-                        "content": result
-                    })
-                    print(f"\nResult: {result}")
+                if text:
+                    self.conversation.append(self._format_conversation_message(text, image))
+                    print(f"\nResult: {text}")
+                    
+                if image:
+                    print(f"[Image data: {len(image)} bytes]")
                 
                 # Print current state
                 state = "Home Screen" if self.current_app is None else f"In {self.current_app.name}"

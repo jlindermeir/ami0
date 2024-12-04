@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Type, List
+from typing import Type, List, Tuple, Optional
 from pydantic import BaseModel
 
 class App(ABC):
@@ -27,6 +27,7 @@ class App(ABC):
         pass
     
     @abstractmethod
-    def handle_response(self, response: BaseModel) -> str:
-        """Handle a response from the model and update app state accordingly."""
+    def handle_response(self, response: BaseModel) -> Tuple[str, Optional[str]]:
+        """Handle a response from the model and update app state accordingly.
+        Returns a tuple of (text_response, optional_base64_image)."""
         pass

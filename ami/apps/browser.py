@@ -1,6 +1,8 @@
+import base64
 import logging
-from typing import Type, List, Literal
+from typing import Type, List, Tuple, Optional, Literal
 from urllib.parse import urljoin
+from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError
 from pydantic import BaseModel, Field
 
@@ -16,16 +18,20 @@ class ClickAction(BaseModel):
     type: Literal["click"]
     element: int = Field(description="Element number to click (as shown in <N>)")
 
+class ScreenshotAction(BaseModel):
+    """Action for taking a screenshot."""
+    type: Literal["screenshot"]
+
 class BrowserApp(App):
     """A text-based browser app using Playwright."""
     
     def __init__(self, name: str = "browser", headless: bool = True):
         super().__init__(name)
-        self.headless = headless
         self.playwright = None
         self.browser = None
         self.context = None
         self.page = None
+        self.headless = headless
         self.user_agent = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -47,14 +53,15 @@ class BrowserApp(App):
     def description(self) -> str:
         return (
             "A text-based browser that allows you to navigate websites and click elements. "
-            "Elements that can be clicked are annotated with numbers in <N> format."
+            "Elements that can be clicked are annotated with numbers in <N> format. "
+            "You can also take screenshots of pages."
         )
     
     @property
     def usage_prompt(self) -> str:
         current_url = self.page.url if self.page else "No page loaded"
         return f"""
-This is the Browser app. You can navigate to URLs and click on elements.
+This is the Browser app. You can navigate to URLs, click on elements, and take screenshots.
 
 Current URL: {current_url}
 
@@ -71,13 +78,18 @@ Available actions:
     "element": 1
 }}
 
+3. Take a screenshot of the current page:
+{{
+    "type": "screenshot"
+}}
+
 The page content will show clickable elements marked with <N> where N is the element number.
 For example, "Click here<1>" means you can click this element using element number 1.
 """.strip()
     
     def get_action_models(self) -> List[Type[BaseModel]]:
         """Return the action models supported by this app."""
-        return [NavigateAction, ClickAction]
+        return [NavigateAction, ClickAction, ScreenshotAction]
     
     def annotate_clickable_elements(self):
         """Annotate clickable elements with option numbers."""
@@ -107,17 +119,26 @@ For example, "Click here<1>" means you can click this element using element numb
         logging.debug("Page text retrieved.")
         return body_text
     
-    def navigate_to_url(self, url: str) -> str:
+    def take_screenshot(self) -> Optional[str]:
+        """Take a screenshot and return it as base64."""
+        try:
+            screenshot_bytes = self.page.screenshot()
+            return base64.b64encode(screenshot_bytes).decode('utf-8')
+        except Exception as e:
+            logging.error(f"Error taking screenshot: {e}")
+            return None
+    
+    def navigate_to_url(self, url: str) -> Tuple[str, Optional[str]]:
         """Navigate to the specified URL and return the page content."""
         try:
             self.page.goto(url, wait_until='networkidle')
             logging.info(f"Navigated to URL: {url}")
-            return self.get_annotated_page_content()
+            return (self.get_annotated_page_content(), None)
         except Exception as e:
             logging.error(f"Failed to load URL {url}: {e}")
             raise
     
-    def click_element(self, element_number: int) -> str:
+    def click_element(self, element_number: int) -> Tuple[str, Optional[str]]:
         """Click the element with the specified number and return the new page content."""
         elements = self.page.query_selector_all(
             "a[href], button, input[type=button], input[type=submit], input[type=reset]"
@@ -136,7 +157,7 @@ For example, "Click here<1>" means you can click this element using element numb
                 element.click()
                 self.page.wait_for_load_state('networkidle')
                 logging.info(f"Clicked element and navigated to: {self.page.url}")
-                return self.get_annotated_page_content()
+                return (self.get_annotated_page_content(), None)
             except TimeoutError:
                 logging.error("Timed out waiting for page to load after click.")
                 raise
@@ -144,12 +165,16 @@ For example, "Click here<1>" means you can click this element using element numb
                 logging.error(f"Error clicking the element: {e}")
                 raise
     
-    def handle_response(self, response: BaseModel) -> str:
-        """Handle browser actions and return the page content."""
+    def handle_response(self, response: BaseModel) -> Tuple[str, Optional[str]]:
+        """Handle browser actions and return the page content and optional screenshot."""
         if isinstance(response, NavigateAction):
             return self.navigate_to_url(response.url)
         elif isinstance(response, ClickAction):
             return self.click_element(response.element)
+        elif isinstance(response, ScreenshotAction):
+            content = self.get_annotated_page_content()
+            screenshot = self.take_screenshot()
+            return (content, screenshot)
         else:
             raise ValueError(f"Unknown action type: {type(response)}")
     

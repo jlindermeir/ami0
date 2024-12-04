@@ -1,9 +1,8 @@
 from enum import Enum
-from typing import Type, Literal, List
+from typing import Type, List, Tuple, Optional, Literal
 from pydantic import BaseModel, Field
 
 from ami.app import App
-from ami.models import BaseResponse
 
 class TextEffect(str, Enum):
     """Available text effects for the echo app."""
@@ -56,7 +55,7 @@ This would return: "HELLO WORLD"
         """Return the action models supported by this app."""
         return [EchoAction]
     
-    def handle_response(self, response: EchoAction) -> str:
+    def handle_response(self, response: EchoAction) -> Tuple[str, Optional[str]]:
         """Apply the selected effect to the message and return it."""
         message = response.message
         effect = response.effect
@@ -71,4 +70,4 @@ This would return: "HELLO WORLD"
             result = ''.join(c.upper() if i % 2 == 0 else c.lower()
                            for i, c in enumerate(message))
         
-        return f"Echo ({effect.value}): {result}" 
+        return (f"Echo ({effect.value}): {result}", None) 
