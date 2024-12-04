@@ -43,8 +43,11 @@ def main():
     # Set up logging first
     setup_logging()
     
+    # Set the model
+    model = "gpt-4o-mini"
+    
     # Create and initialize the OS
-    os = OS()
+    os = OS(model=model)
     
     # Register our Echo app
     os.register_app(EchoApp())

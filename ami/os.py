@@ -31,13 +31,14 @@ def get_user_confirmation(prompt: str, default: str = 'y') -> bool:
 class OS:
     """Main operating system class that manages apps and handles the event loop."""
     
-    def __init__(self):
+    def __init__(self, model: str):
         self.client = OpenAI()
+        self.model = model
         self.apps: dict[str, App] = {}
         self.current_app: Optional[App] = None
         self.conversation: List[Dict[str, str]] = []
         self._app_enum: Optional[Type[Enum]] = None
-        logger.info("Initialized OS")
+        logger.info(f"Initialized OS with model: {model}")
     
     def _create_app_enum(self) -> Type[Enum]:
         """Create an enum of available apps."""
@@ -193,7 +194,7 @@ class OS:
                 response_format = self.current_response_format
                 
                 completion = self.client.beta.chat.completions.parse(
-                    model="gpt-4o-2024-08-06",
+                    model=self.model,
                     messages=[
                         {"role": "system", "content": self.system_prompt},
                         *self.conversation[-10:]  # Keep last 10 messages for context
