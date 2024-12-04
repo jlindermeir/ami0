@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from ami.os import OS
-from ami.apps import EchoApp, SSHApp
+from ami.apps import EchoApp, SSHApp, BrowserApp
 
 def setup_logging():
     """Configure detailed logging with both file and console output."""
@@ -60,6 +60,7 @@ def main():
     os = OS(model=model, user_prompt=user_prompt)
     
     # Register our apps
+    os.register_app(BrowserApp(headless=False))
     os.register_app(EchoApp())
     os.register_app(SSHApp())
     
