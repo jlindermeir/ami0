@@ -1,10 +1,15 @@
 from typing import Optional, Type, Union, List, Dict, Any
+import json
+import logging
+from enum import Enum
 from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
-import logging
 
 from .app import App
 from .models import LaunchAppResponse, ExitAppResponse
+
+# Create module-level logger
+logger = logging.getLogger(__name__)
 
 def get_user_confirmation(prompt: str, default: str = 'y') -> bool:
     """Get user confirmation for an action."""
@@ -31,10 +36,25 @@ class OS:
         self.apps: dict[str, App] = {}
         self.current_app: Optional[App] = None
         self.conversation: List[Dict[str, str]] = []
+        self._app_enum: Optional[Type[Enum]] = None
+        logger.info("Initialized OS")
+    
+    def _create_app_enum(self) -> Type[Enum]:
+        """Create an enum of available apps."""
+        if not self.apps:
+            raise ValueError("No apps registered")
         
+        # Create enum dynamically
+        return Enum('AvailableApps', {
+            app_name: app_name for app_name in self.apps.keys()
+        })
+    
     def register_app(self, app: App) -> None:
         """Register a new app with the system."""
+        logger.info(f"Registering app: {app.name}")
         self.apps[app.name] = app
+        # Recreate enum when apps change
+        self._app_enum = self._create_app_enum()
     
     @property
     def system_prompt(self) -> str:
@@ -50,21 +70,26 @@ class OS:
             # Home screen prompt
             app_list = "\n".join(f"- {name}: {app.description}" 
                                for name, app in self.apps.items())
-            return f"{base_prompt}\n\nAvailable apps:\n{app_list}"
+            prompt = f"{base_prompt}\n\nAvailable apps:\n{app_list}"
         else:
             # App-specific prompt
-            return f"{base_prompt}\n\n{self.current_app.description}\n\nYou can return to the home screen by choosing to exit the app."
+            prompt = f"{base_prompt}\n\n{self.current_app.description}\n\nYou can return to the home screen by choosing to exit the app."
+        
+        logger.debug(f"Generated system prompt:\n{prompt}")
+        return prompt
     
     @property
     def current_response_format(self) -> Type[BaseModel]:
         """Get the current expected response format."""
         if self.current_app is None:
-            # In home screen, only allow launching apps
-            return create_model(
+            # In home screen, only allow launching apps with enum values
+            format = create_model(
                 "HomeResponse",
                 thought=(str, Field(description="Your reasoning for this action")),
+                app_name=(self._app_enum, Field(description="The app to launch")),
                 __base__=LaunchAppResponse
             )
+            logger.debug("Using home screen response format")
         else:
             # In app, allow either app-specific actions or exiting
             app_format = self.current_app.current_response_format
@@ -75,50 +100,73 @@ class OS:
             )
             
             # Create a union of the app response and exit response
-            return create_model(
+            format = create_model(
                 f"AppResponse",
                 thought=(str, Field(description="Your reasoning for this action")),
                 action=(Union[app_format, exit_format], Field(...)),
             )
+            logger.debug(f"Using app response format for {self.current_app.name}")
+        
+        return format
     
     def handle_agent_action(self, response: Any) -> Optional[str]:
         """Handle an agent's action, returning any result from the app."""
-        # First, log the agent's thought process
-        logging.info(f"Agent's thought: {response.thought}")
+        # Log the complete response for debugging
+        logger.debug(f"Agent response:\n{response.model_dump_json(indent=2)}")
+        logger.info(f"Agent's thought: {response.thought}")
         
         # Handle the response based on current state
         if isinstance(response, LaunchAppResponse):
+            app_name = response.app_name.value  # Get string value from enum
+            logger.info(f"Agent wants to launch app: {app_name}")
             # Ask for confirmation before launching app
-            if not get_user_confirmation(f"Allow agent to launch app '{response.app_name}'?"):
+            if not get_user_confirmation(f"Allow agent to launch app '{app_name}'?"):
+                logger.info("User denied app launch")
                 return "Action denied by user"
                 
-            if response.app_name in self.apps:
-                self.current_app = self.apps[response.app_name]
-                return f"Launched app: {response.app_name}"
-            else:
-                raise ValueError(f"Unknown app: {response.app_name}")
+            self.current_app = self.apps[app_name]  # Will always exist due to enum
+            logger.info(f"Launched app: {app_name}")
+            return f"Launched app: {app_name}"
                 
         elif isinstance(response.action, ExitAppResponse):
+            logger.info(f"Agent wants to exit app: {self.current_app.name}")
             # Ask for confirmation before exiting app
             if not get_user_confirmation(f"Allow agent to exit app '{self.current_app.name}'?"):
+                logger.info("User denied app exit")
                 return "Action denied by user"
                 
+            app_name = self.current_app.name
             self.current_app = None
+            logger.info(f"Exited app: {app_name}")
             return "Returned to home screen"
             
         else:
             if self.current_app is None:
+                logger.error("Attempted app action without active app")
                 raise ValueError("No app is currently active")
                 
             # Ask for confirmation before executing app action
             action_desc = str(response.action)  # Get string representation of the action
+            logger.info(f"Agent wants to perform action in {self.current_app.name}: {action_desc}")
+            
             if not get_user_confirmation(f"Allow agent to perform action in {self.current_app.name}?\nAction: {action_desc}"):
+                logger.info("User denied app action")
                 return "Action denied by user"
-                
-            return self.current_app.handle_response(response.action)
+            
+            try:
+                result = self.current_app.handle_response(response.action)
+                logger.info(f"App action result: {result}")
+                return result
+            except Exception as e:
+                logger.error(f"Error executing app action: {str(e)}", exc_info=True)
+                raise
     
     def run(self):
         """Main event loop."""
+        if not self._app_enum:
+            raise ValueError("No apps registered. Please register at least one app before running.")
+            
+        logger.info("Starting autonomous agent system")
         print("Starting autonomous agent system")
         print("The agent will request permission before taking any actions.")
         print("Initial state: Home Screen")
@@ -131,7 +179,11 @@ class OS:
         
         while True:
             try:
+                # Log conversation state
+                logger.debug(f"Current conversation state:\n{json.dumps(self.conversation[-10:], indent=2)}")
+                
                 # Get next action from model
+                logger.info("Requesting next action from agent")
                 completion = self.client.beta.chat.completions.parse(
                     model="gpt-4o-2024-08-06",
                     messages=[
@@ -156,6 +208,7 @@ class OS:
                 
                 # Print current state
                 state = "Home Screen" if self.current_app is None else f"In {self.current_app.name}"
+                logger.info(f"Current state: {state}")
                 print(f"Current state: {state}")
                 
                 # Add prompt for next action
@@ -165,10 +218,11 @@ class OS:
                 })
                 
             except KeyboardInterrupt:
+                logger.info("Received shutdown signal")
                 print("\nShutting down...")
                 break
             except Exception as e:
-                logging.error(f"Error: {str(e)}")
+                logger.error(f"Error in main loop: {str(e)}", exc_info=True)
                 self.conversation.append({
                     "role": "system",
                     "content": f"Error occurred: {str(e)}"

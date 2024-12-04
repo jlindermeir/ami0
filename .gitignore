@@ -1,3 +1,6 @@
 .env
+__pycache__/
+.venv/
 .idea/
+logs/
 runtime/data/*.png
