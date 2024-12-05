@@ -59,6 +59,9 @@ Features:
 - Full output (stdout and stderr) is captured
 - Exit codes are returned
 
+Usage Notes:
+- When writing files with multiple lines, split the lines into separate commands, and use the `>>` operator to append to the file.
+
 Example action:
 {{
     "type": "ssh",

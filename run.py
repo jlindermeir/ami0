@@ -33,7 +33,7 @@ def setup_logging():
     )
     
     # Set debug level for our module
-    logging.getLogger('ami').setLevel(logging.DEBUG)
+    logging.getLogger('ami').setLevel(logging.INFO)
     
     # Reduce noise from other libraries
     logging.getLogger('openai').setLevel(logging.INFO)
@@ -49,7 +49,7 @@ def main():
     setup_logging()
     
     # Set the model
-    model = "gpt-4o-mini"
+    model = "gpt-4o"
     
     # Read the user prompt
     prompt_path = Path(__file__).parent / "prompts" / "system.md"
@@ -61,7 +61,7 @@ def main():
     
     # Register our apps
     os.register_app(BrowserApp(headless=False))
-    os.register_app(EchoApp())
+    # os.register_app(EchoApp())
     os.register_app(SSHApp())
     
     try:
