@@ -146,7 +146,7 @@ You are connected as: {self.config['username']}@{self.config['host']}
             client.close()
 
         return CommandResult(
-            exit_code=exit_status or -1,
+            exit_code=exit_status if exit_status is not None else -1,
             stdout=stdout_str,
             stderr=stderr_str
         )
