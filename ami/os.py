@@ -52,7 +52,7 @@ def get_user_confirmation(prompt: str, default: str = 'y') -> bool:
 class OS:
     """Main operating system class that manages apps and handles the event loop."""
     
-    def __init__(self, model: str = "gpt-4o-2024-08-06", user_prompt: Optional[str] = None):
+    def __init__(self, model: str, user_prompt: Optional[str] = None):
         self.client = OpenAI()
         self.model = model
         self.apps: dict[str, App] = {}
@@ -141,7 +141,12 @@ class OS:
         else:
             content = [
                 {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image}"}}
+                {
+                    "type": "image_url", 
+                    "image_url": {
+                        "url": f"data:image/png;base64,{image}"
+                    }
+                }
             ]
         
         return {"role": "user", "content": content}

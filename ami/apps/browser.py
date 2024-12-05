@@ -122,8 +122,8 @@ For example, "Click here<1>" means you can click this element using element numb
     def take_screenshot(self) -> Tuple[str, Optional[str]]:
         """Take a screenshot and return it as base64."""
         try:
-            screenshot_bytes = self.page.screenshot()
-            return (None, base64.b64encode(screenshot_bytes).decode('utf-8'))
+            screenshot_bytes = self.page.screenshot(type="png")
+            return ("", base64.b64encode(screenshot_bytes).decode('utf-8'))
         except Exception as e:
             logging.error(f"Error taking screenshot: {e}")
             raise
