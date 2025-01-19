@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from ami.os import OS
-from ami.apps import EchoApp, SSHApp, BrowserApp
+from ami.apps import SSHApp, BrowserApp
 
 ### Configuration:
 # Run the Playwright browser in headless mode
