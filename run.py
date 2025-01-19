@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 from ami.os import OS
 from ami.apps import EchoApp, SSHApp, BrowserApp
 
+### Configuration:
+# Run the Playwright browser in headless mode
+BROWSER_HEADLESS = False
+
 def setup_logging():
     """Configure detailed logging with both file and console output."""
     # Create logs directory if it doesn't exist
@@ -60,8 +64,7 @@ def main():
     os = OS(model=model, user_prompt=user_prompt)
     
     # Register our apps
-    os.register_app(BrowserApp(headless=False))
-    # os.register_app(EchoApp())
+    os.register_app(BrowserApp(headless=BROWSER_HEADLESS))
     os.register_app(SSHApp())
     
     try:
