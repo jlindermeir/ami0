@@ -43,7 +43,10 @@ docker run -d -p 2222:22 ubuntu-ssh
 4. (Optional) Adjust the system prompt in to the specific use case in [system.md](prompts/system.md).
 By default, the agent is tasked to play a [Wiki game](https://en.wikipedia.org/wiki/Wikipedia:Wiki_Game).
 
-5. Run the agent:
+5. Start the agent by executing the [run.py](run.py) script. 
+You will be prompted to confirm each action the agent wants to take.
+By default, the browser window will be rendered, 
+but you can also run the agent in headless mode by switching the `BROWSER_HEADLESS` paramter in the `run.py` script.
 ```bash
-python ami0.py
+python run.py
 ```
