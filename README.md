@@ -20,7 +20,7 @@ The agent is able to switch between apps, and can be extended with new apps easi
 1. Install python requirements.
 I usually create a virtual environment for this.
 ```bash
-python -m venv .vent
+python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
