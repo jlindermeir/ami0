@@ -50,3 +50,25 @@ but you can also run the agent in headless mode by switching the `BROWSER_HEADLE
 ```bash
 python run.py
 ```
+
+## Roadmap
+- [ ] **Memory** - Implement a memory feature, so the agent can remember previous states and actions. 
+This solves to problem of the context window being exhausted after a number of loop executions, 
+especially if multiple (large) websites area visited.
+Idea: Use a vector database to store memories, 
+which are either generated explicitly by the agent (expand the response model), 
+or use a separate LLM call to summarize one or a batch of interactions.
+The generated memories can the be embedded and stored in the database.
+Cosine similarity can be used to retrieve memories.
+- [ ] **Text editor app** - Implement an app which can edit text files, with a more ergonomic interface for the agent.
+Currently, the agent defaults to writing files by `cat`ing each line, which is not token-efficient and leads to mistakes.
+A text editor would provide actions to open a specific file on the connected Docker container (also via SSH),
+and provide actions to insert, delete, and edit lines of the file.
+
+## Notes
+- Obviously, this is not a production-ready system. 
+If you stumble upon this repo anyway and find it useful, shoot me a message on X/Twitter.
+- The vast majority of the code was written by LLMs (Cursor and to a lesser degree ChatGPT), 
+so it's a bit sloppy in places.
+I promise I can write cleaner code during the day, but for side projects like this, 
+the development speed is more important.
